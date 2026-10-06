@@ -23,10 +23,14 @@ from lib.dates import today_iso
 from models.pandi import (
     ChatHistory,
     ChatMessage,
+    ChatSession,
     ChatStreamRequest,
     FileUploadResponse,
+    MemoryUpdate,
     Profile,
     ProfileUpsert,
+    SceneSpec,
+    SessionRename,
     SourceRef,
     TodayResponse,
 )
@@ -37,45 +41,87 @@ router = APIRouter(prefix="/pandi", tags=["pandi"])
 UPLOAD_DIR = Path("/tmp/pandi_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+SCENE_OPEN = "<<<PANDI_SCENE>>>"
+SCENE_CLOSE = "<<<END_SCENE>>>"
+
 ALLOWED_MIME_TYPES = {
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain",
     "text/csv",
+    "text/markdown",
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "image/jpeg",
     "image/png",
     "image/webp",
+    "image/gif",
     "audio/mpeg",
     "audio/wav",
     "audio/ogg",
+    "audio/webm",
     "video/mp4",
     "video/quicktime",
+    "video/webm",
 }
+
+SCENE_CATALOG = """
+VIRTUAL LAB SCENE CATALOG (scene -> params):
+- "solar-system": {"focus": "<planet name or null>"}  (8 planets, Sun, Moon, Saturn rings)
+- "atom": {"atomicNumber": <int>, "symbol": "<e.g. C>", "name": "<Carbon>"}
+- "molecule": {"formula": "<H2O|CO2|CH4|NH3|O2|N2|HCl|NaCl|C2H5OH|C6H6>"}
+- "geometry": {"shape": "cube|cuboid|sphere|cylinder|cone|pyramid|prism", "a": <num>, "b": <num>, "c": <num>, "r": <num>, "h": <num>}
+- "graph": {"mode": "2d|3d", "expressions": ["<f(x) like x^2 - 4>", ...] or ["<f(x,y) like sin(x)*cos(y)>"], "xRange": [-5, 5]}
+- "equation": {"expression": "<left side as f(x) = 0, e.g. 3*x^2 - 12>", "roots": [<num>, ...]}   (use "steps" for each solving step)
+- "projectile": {"speed": <m/s>, "angle": <degrees>}
+- "pendulum": {"length": <m>}
+- "wave": {"amplitude": <num>, "wavelength": <num>, "frequency": <num>}
+- "circuit": {"voltage": <V>, "resistance": <ohm>}
+- "optics": {"mode": "reflection|refraction", "angle": <deg>, "n1": <num>, "n2": <num>}
+- "cell": {"type": "animal|plant"}
+- "dna": {}
+- "heart": {}
+- "states-of-matter": {"state": "solid|liquid|gas|all"}
+- "earth-seasons": {}
+- "moon-phases": {}
+- "eclipse": {"type": "solar|lunar"}
+- "custom": {"objects": [{"shape": "sphere|box|cylinder|cone|torus|ring|capsule|octahedron|icosahedron|plane|arrow", "color": "<hex>", "position": [x, y, z], "size": [sx, sy, sz] or <num>, "label": "<text>", "animation": "none|rotate|orbit|pulse|bounce|float", "orbitRadius": <num>, "speed": <num>, "wire": <bool>, "opacity": <0-1>}, ...]}
+  (use "custom" for ANY topic not covered above - build the concept procedurally from 3-14 labelled shapes, e.g. a volcano, lungs, a bridge, a food chain. Keep coordinates within -6..6.)
+- "generic": {"label": "<short label>"}  (last resort only)
+"""
 
 
 def _sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-def _visual_scene_for(text: str) -> str | None:
+def _scene_fallback(text: str) -> SceneSpec | None:
+    """Keyword safety net when the model forgets the scene block for an obviously visual topic."""
     lowered = text.lower()
-    if any(term in lowered for term in ("solar system", "planets", "planetary orbit", "saturn", "neptune")):
-        return "solar-system"
-    if any(term in lowered for term in ("atom", "electron", "proton", "neutron", "orbital")):
-        return "atom"
-    if any(term in lowered for term in ("geometry", "cube", "sphere", "polyhedron", "3d math", "3d maths")):
-        return "geometry"
-    if any(term in lowered for term in ("surface", "coordinate plane", "parametric", "function in 3d", "3d graph")):
-        return "math-surface"
+    rules: list[tuple[tuple[str, ...], SceneSpec]] = [
+        (("solar system", "planets", "planetary orbit"), SceneSpec(scene="solar-system", title="Solar System", stats=["8 planets", "1 star"])),
+        (("dna", "double helix"), SceneSpec(scene="dna", title="DNA Double Helix")),
+        (("human heart", "how the heart", "heart work"), SceneSpec(scene="heart", title="Human Heart")),
+        (("moon phase",), SceneSpec(scene="moon-phases", title="Moon Phases")),
+        (("eclipse",), SceneSpec(scene="eclipse", title="Eclipse", params={"type": "solar"})),
+        (("season",), SceneSpec(scene="earth-seasons", title="Earth's Seasons")),
+        (("pendulum",), SceneSpec(scene="pendulum", title="Pendulum", params={"length": 2})),
+        (("projectile",), SceneSpec(scene="projectile", title="Projectile Motion", params={"speed": 20, "angle": 45})),
+        (("water molecule", "h2o"), SceneSpec(scene="molecule", title="Water Molecule", params={"formula": "H2O"})),
+        (("atom look", "an atom", "the atom", "atomic structure"), SceneSpec(scene="atom", title="Atom", params={"atomicNumber": 6, "symbol": "C", "name": "Carbon"})),
+        (("cube",), SceneSpec(scene="geometry", title="Cube", params={"shape": "cube", "a": 3})),
+        (("sphere",), SceneSpec(scene="geometry", title="Sphere", params={"shape": "sphere", "r": 2})),
+    ]
+    for terms, spec in rules:
+        if any(term in lowered for term in terms):
+            return spec
     return None
 
 
 def _is_date_query(text: str) -> bool:
     lowered = text.lower()
-    date_terms = ("today", "current date", "what date", "what day is it", "date today")
+    date_terms = ("today", "current date", "what date", "what day is it", "date today", "what time")
     freshness_terms = ("news", "weather", "price", "score", "latest", "recent", "announcement")
     return any(term in lowered for term in date_terms) and not any(term in lowered for term in freshness_terms)
 
@@ -84,7 +130,7 @@ def _needs_live_search(text: str) -> bool:
     lowered = text.lower()
     freshness_terms = (
         "today's news", "today news", "current news", "latest", "recent", "weather", "forecast",
-        "stock price", "price of", "score", "schedule", "release", "announcement", "this week",
+        "stock price", "price of", "score", "schedule", "release", "announcement", "this week", "news",
     )
     return any(term in lowered for term in freshness_terms)
 
@@ -94,10 +140,32 @@ def _sources_from_text(text: str) -> list[SourceRef]:
     return [SourceRef(url=url.rstrip(".,")) for url in urls[:8]]
 
 
-def _normalize_for_model(value: object) -> str:
-    if isinstance(value, datetime):
-        return value.isoformat()
-    return str(value)
+def _parse_scene(raw: str) -> SceneSpec | None:
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict) and data.get("scene"):
+            data.pop("explanation", None)
+            return SceneSpec(**data)
+    except Exception as exc:
+        logger.warning("Scene block could not be parsed: %s", exc)
+    return None
+
+
+def _split_scene(answer: str) -> tuple[str, SceneSpec | None]:
+    """Remove the scene block from the final text (wherever the model put it)."""
+    match = re.search(re.escape(SCENE_OPEN) + r"(.*?)" + re.escape(SCENE_CLOSE), answer, flags=re.S)
+    if not match:
+        if SCENE_OPEN in answer:  # unterminated block: drop it and try to salvage the JSON
+            head, _, tail = answer.partition(SCENE_OPEN)
+            return head.strip(), _parse_scene(tail.strip())
+        return answer, None
+    cleaned = (answer[: match.start()] + answer[match.end():]).strip()
+    return cleaned, _parse_scene(match.group(1).strip())
+
+
+def _memory_candidate(text: str) -> str | None:
+    match = re.match(r"^\s*(?:please\s+)?remember(?:\s+that)?\s+(.{3,200})$", text.strip(), flags=re.I)
+    return match.group(1).strip().rstrip(".") if match else None
 
 
 @router.get("/health")
@@ -121,18 +189,54 @@ async def get_profile(profile_id: str) -> Profile:
 @router.put("/profile/{profile_id}", response_model=Profile)
 async def upsert_profile(profile_id: str, input: ProfileUpsert) -> Profile:
     now = datetime.now(timezone.utc)
-    current = await db.pandi_profiles.find_one({"profile_id": profile_id})
+    current = await db.pandi_profiles.find_one({"profile_id": profile_id}) or {}
     profile = Profile(
         profile_id=profile_id,
         name=input.name.strip(),
         avatar_data_url=input.avatar_data_url,
-        created_at=current.get("created_at", now) if current else now,
+        memory=current.get("memory", []),
+        created_at=current.get("created_at", now),
         updated_at=now,
     )
-    await db.pandi_profiles.replace_one(
-        {"profile_id": profile_id}, profile.model_dump(), upsert=True
-    )
+    await db.pandi_profiles.replace_one({"profile_id": profile_id}, profile.model_dump(), upsert=True)
     return profile
+
+
+@router.put("/profile/{profile_id}/memory", response_model=Profile)
+async def update_memory(profile_id: str, input: MemoryUpdate) -> Profile:
+    current = await db.pandi_profiles.find_one({"profile_id": profile_id})
+    if not current:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    cleaned = [item.strip()[:200] for item in input.memory if item.strip()]
+    await db.pandi_profiles.update_one(
+        {"profile_id": profile_id},
+        {"$set": {"memory": cleaned, "updated_at": datetime.now(timezone.utc)}},
+    )
+    return Profile(**{**current, "memory": cleaned})
+
+
+@router.get("/sessions/{profile_id}", response_model=list[ChatSession])
+async def list_sessions(profile_id: str) -> list[ChatSession]:
+    rows = await db.pandi_sessions.find({"profile_id": profile_id}).sort("updated_at", -1).to_list(100)
+    return [ChatSession(**row) for row in rows]
+
+
+@router.patch("/sessions/{session_id}", response_model=ChatSession)
+async def rename_session(session_id: str, input: SessionRename) -> ChatSession:
+    result = await db.pandi_sessions.find_one_and_update(
+        {"session_id": session_id},
+        {"$set": {"title": input.title.strip()[:80]}},
+        return_document=True,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return ChatSession(**result)
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(session_id: str) -> None:
+    await db.pandi_sessions.delete_one({"session_id": session_id})
+    await db.pandi_messages.delete_many({"session_id": session_id})
 
 
 @router.get("/history/{session_id}", response_model=ChatHistory)
@@ -145,7 +249,7 @@ async def get_history(session_id: str) -> ChatHistory:
 async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
     mime_type = file.content_type or "application/octet-stream"
     if mime_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=415, detail="This file type is not supported for analysis.")
+        raise HTTPException(status_code=415, detail=f"'{mime_type}' is not supported for analysis.")
 
     content = await file.read()
     if not content:
@@ -167,11 +271,21 @@ async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
             "created_at": datetime.now(timezone.utc),
         }
     )
-    return FileUploadResponse(
-        file_id=file_id,
-        filename=file.filename or "uploaded-file",
-        mime_type=mime_type,
-        size=len(content),
+    return FileUploadResponse(file_id=file_id, filename=file.filename or "uploaded-file", mime_type=mime_type, size=len(content))
+
+
+async def _touch_session(request: ChatStreamRequest) -> None:
+    if not request.profile_id:
+        return
+    now = datetime.now(timezone.utc)
+    title = re.sub(r"\s+", " ", request.message.strip())[:60]
+    await db.pandi_sessions.update_one(
+        {"session_id": request.session_id},
+        {
+            "$set": {"updated_at": now, "profile_id": request.profile_id},
+            "$setOnInsert": {"session_id": request.session_id, "title": title or "New chat", "created_at": now},
+        },
+        upsert=True,
     )
 
 
@@ -182,40 +296,32 @@ async def _stream_chat(request: ChatStreamRequest, file_rows: list[dict]) -> Asy
         role="user",
         content=request.message,
         live_search=should_search,
+        attachments=[row["filename"] for row in file_rows],
     )
     await db.pandi_messages.insert_one(user_message.model_dump())
+    await _touch_session(request)
+
+    profile = await db.pandi_profiles.find_one({"profile_id": request.profile_id}) if request.profile_id else None
+    memory_items: list[str] = list(profile.get("memory", [])) if profile else []
+    remembered = _memory_candidate(request.message)
+    if remembered and profile and remembered not in memory_items:
+        memory_items.append(remembered)
+        await db.pandi_profiles.update_one({"profile_id": request.profile_id}, {"$set": {"memory": memory_items[-60:]}})
 
     previous = await db.pandi_messages.find({"session_id": request.session_id}).sort("created_at", -1).to_list(14)
     previous.reverse()
-    context_lines = [
-        f"{row.get('role', 'user').upper()}: {row.get('content', '')}" for row in previous[:-1]
-    ]
+    context_lines = [f"{row.get('role', 'user').upper()}: {row.get('content', '')[:1500]}" for row in previous[:-1]]
     context = "\n".join(context_lines[-12:]) or "No earlier turns."
-    visual_scene = _visual_scene_for(request.message)
     today = today_iso()
 
-    yield _sse(
-        "meta",
-        {
-            "message_id": user_message.id,
-            "today": today,
-            "visual_scene": visual_scene,
-            "live_search": should_search,
-        },
-    )
+    yield _sse("meta", {"message_id": user_message.id, "today": today, "live_search": should_search, "remembered": remembered})
 
     if _is_date_query(request.message):
-        answer = f"Today is {today} (UTC)."
-        assistant_message = ChatMessage(
-            session_id=request.session_id,
-            role="assistant",
-            content=answer,
-            live_search=False,
-            visual_scene=visual_scene,
-        )
+        answer = f"Today is **{today}** (UTC)."
+        assistant_message = ChatMessage(session_id=request.session_id, role="assistant", content=answer)
         await db.pandi_messages.insert_one(assistant_message.model_dump())
         yield _sse("delta", {"text": answer})
-        yield _sse("done", {"message_id": assistant_message.id, "content": answer, "sources": [], "visual_scene": visual_scene})
+        yield _sse("done", {"message_id": assistant_message.id, "content": answer, "sources": [], "scene": None})
         return
 
     api_key = os.environ.get("EMERGENT_LLM_KEY", "")
@@ -223,22 +329,31 @@ async def _stream_chat(request: ChatStreamRequest, file_rows: list[dict]) -> Asy
         yield _sse("error", {"message": "Live AI is not configured. Text mode remains available after setup."})
         return
 
-    system_message = f"""You are PANDI AI MARK II (Personalized Advanced Neural Digital Intelligence), created by VIGNASHWAR S.
-You are a precise, warm, educational assistant. The current UTC date is {today}; never invent a current date.
-The user language preference is {request.language}. Auto-detect the user's language and reply in that same language unless they ask otherwise.
-When live web search is enabled, use it for current or time-sensitive claims. Prefer reliable sources, mention publication timing when available, and include source URLs in the response. Never fabricate live information.
-When explaining science or mathematics, be honest about educationally adjusted scales and make clear when a model is conceptual.
-If a topic benefits from a visual explanation, describe which visual scene would help; the client may open the PANDI 3D Explainer Engine.
-Keep answers clear and useful. Do not claim to have analyzed a file unless the attached file was actually available to you.
+    operator = profile.get("name", "Operator") if profile else "Operator"
+    memory_block = "\n".join(f"- {item}" for item in memory_items) or "- (nothing stored yet)"
+    system_message = f"""You are PANDI AI MARK II (Personalized Advanced Neural Digital Intelligence), a holographic lab intelligence created by VIGNASHWAR S.
+You speak to your operator, {operator}, in a warm, precise, cinematic-but-clear tone. The current UTC date is {today}; never invent a date.
+Reply in the user's language (preference: {request.language}). Format answers with Markdown (headings, **bold**, lists, LaTeX with $...$ for math).
+
+MOTTO: "Don't just tell the user - show them." For any science or mathematics question where a visual helps, you MUST begin your reply with ONE scene block on its own line, then the explanation:
+{SCENE_OPEN}{{"scene": "<type>", "params": {{...}}, "title": "<SHORT TOPIC>", "steps": ["<short spoken step 1>", "<step 2>", ...], "stats": ["<fact chip>", "<fact chip>", ...]}}{SCENE_CLOSE}
+Rules for the block: valid JSON on a single line, 3-6 steps that mirror the order of your explanation, 2-5 short stat chips (e.g. "8 planets", "V = a³"). Use an exact scene type from the catalog; when nothing fits, build a "custom" scene from labelled shapes. Non-visual questions (arithmetic, chit-chat, current events, file summaries) get NO scene block.
+When a scene block is present keep the explanation SHORT and spoken-friendly (60-140 words), because it is read aloud while the hologram plays. Longer detail only if the user asks.
+{SCENE_CATALOG}
+Scientific accuracy is mandatory: the Solar System has exactly 8 planets (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune); Pluto is a dwarf planet. State clearly when a visualization uses an educational (not physical) scale.
+When live web search is used, prefer reliable sources, mention publication timing when available and include source URLs. If you cannot verify current information, say: "I currently don't have live web access, so I can't reliably verify today's information." Never fabricate.
+Never claim to have analyzed a file unless it is actually attached in this turn.
+
+Operator memory (facts {operator} asked you to remember):
+{memory_block}
 
 Recent conversation context:
 {context}
 """
 
     try:
-        chat = (
-            LlmChat(api_key=api_key, session_id=f"pandi-{request.session_id}", system_message=system_message)
-            .with_model("gemini", "gemini-3.1-pro-preview")
+        chat = LlmChat(api_key=api_key, session_id=f"pandi-{request.session_id}", system_message=system_message).with_model(
+            "gemini", "gemini-3.1-pro-preview"
         )
         if should_search:
             chat = chat.with_tools([{"googleSearch": {}}])
@@ -250,21 +365,58 @@ Recent conversation context:
         ]
         prompt = request.message
         if should_search:
-            prompt += "\nUse live search when this question needs current information, and cite source URLs in your answer."
+            prompt += "\n(Use live search for current information and cite source URLs.)"
         llm_message = UserMessage(text=prompt, file_contents=attachments or None)
+
         parts: list[str] = []
+        pending = ""  # text held back until we know whether the reply opens with a scene block
+        mode = "detect"  # detect -> scene -> text
+        scene_emitted: SceneSpec | None = None
 
         async for event in chat.stream_message(llm_message):
+            text = ""
             if isinstance(event, TextDelta) and event.content:
-                parts.append(event.content)
-                yield _sse("delta", {"text": event.content})
-            elif isinstance(event, StreamDone):
-                if event.content and not parts:
-                    parts.append(event.content)
-                    yield _sse("delta", {"text": event.content})
+                text = event.content
+            elif isinstance(event, StreamDone) and event.content and not parts:
+                text = event.content
+            if not text:
+                continue
+            parts.append(text)
 
-        answer = "".join(parts).strip()
-        if not answer:
+            if mode == "text":
+                yield _sse("delta", {"text": text})
+                continue
+            pending += text
+            if mode == "detect":
+                head = pending.lstrip()
+                if head.startswith(SCENE_OPEN):
+                    mode = "scene"
+                elif len(head) >= len(SCENE_OPEN) or (head and not SCENE_OPEN.startswith(head)):
+                    mode = "text"
+                    yield _sse("delta", {"text": pending})
+                    pending = ""
+                    continue
+                else:
+                    continue
+            if mode == "scene" and SCENE_CLOSE in pending:
+                block, _, rest = pending.partition(SCENE_CLOSE)
+                scene_emitted = _parse_scene(block.lstrip()[len(SCENE_OPEN):].strip())
+                if scene_emitted:
+                    yield _sse("scene", scene_emitted.model_dump())
+                mode, pending = "text", ""
+                if rest.strip():
+                    yield _sse("delta", {"text": rest.lstrip("\n")})
+
+        if pending and mode != "scene":
+            yield _sse("delta", {"text": pending})
+
+        raw_answer = "".join(parts).strip()
+        answer, parsed = _split_scene(raw_answer)
+        scene = scene_emitted or parsed or (_scene_fallback(request.message) if not file_rows else None)
+        if scene and scene_emitted is None:
+            yield _sse("scene", scene.model_dump())
+
+        if not answer and not scene:
             yield _sse("error", {"message": "PANDI could not produce a response. Please try again."})
             return
 
@@ -275,7 +427,7 @@ Recent conversation context:
             content=answer,
             live_search=should_search,
             sources=sources,
-            visual_scene=visual_scene,
+            scene=scene,
         )
         await db.pandi_messages.insert_one(assistant_message.model_dump())
         yield _sse(
@@ -284,15 +436,12 @@ Recent conversation context:
                 "message_id": assistant_message.id,
                 "content": answer,
                 "sources": [source.model_dump() for source in sources],
-                "visual_scene": visual_scene,
+                "scene": scene.model_dump() if scene else None,
             },
         )
     except Exception:
         logger.exception("PANDI chat stream failed")
-        yield _sse(
-            "error",
-            {"message": "Live AI or web search is temporarily unavailable. Your text can still be retried."},
-        )
+        yield _sse("error", {"message": "Live AI or web search is temporarily unavailable. Please retry in a moment."})
 
 
 @router.post("/chat/stream")

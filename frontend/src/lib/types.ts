@@ -1,14 +1,34 @@
+// Hand-written mirrors of backend/models/pandi.py — keep in sync with the Pydantic models.
+
 export interface Profile {
   profile_id: string;
   name: string;
   avatar_data_url: string | null;
+  memory: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ProfileUpsert {
+  name: string;
+  avatar_data_url?: string | null;
+}
+
+export interface MemoryUpdate {
+  memory: string[];
 }
 
 export interface SourceRef {
   url: string;
   title: string | null;
+}
+
+export interface SceneSpec {
+  scene: string;
+  params: Record<string, unknown>;
+  title: string;
+  steps: string[];
+  stats: string[];
 }
 
 export interface ChatMessage {
@@ -19,12 +39,47 @@ export interface ChatMessage {
   created_at: string;
   live_search: boolean;
   sources: SourceRef[];
-  visual_scene: string | null;
+  scene: SceneSpec | null;
+  attachments: string[];
 }
 
 export interface ChatHistory {
   session_id: string;
   messages: ChatMessage[];
+}
+
+export interface ChatSession {
+  session_id: string;
+  profile_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionRename {
+  title: string;
+}
+
+export interface CustomObject {
+  shape?: string;
+  color?: string;
+  position?: [number, number, number];
+  size?: number | [number, number, number];
+  label?: string;
+  animation?: "none" | "rotate" | "orbit" | "pulse" | "bounce" | "float";
+  orbitRadius?: number;
+  speed?: number;
+  wire?: boolean;
+  opacity?: number;
+}
+
+export interface ChatStreamRequest {
+  session_id: string;
+  profile_id: string | null;
+  message: string;
+  language?: string;
+  use_live_search?: boolean;
+  file_ids?: string[];
 }
 
 export interface FileUploadResponse {
@@ -40,4 +95,14 @@ export interface TodayResponse {
   utc_timestamp: string;
 }
 
-export type SceneKey = "solar-system" | "atom" | "geometry" | "math-surface";
+export interface VoiceStatus {
+  configured: boolean;
+  provider: "elevenlabs" | "browser";
+  voice_id: string | null;
+  cloned: boolean;
+  detail: string;
+}
+
+export interface TTSRequest {
+  text: string;
+}

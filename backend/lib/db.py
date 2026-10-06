@@ -22,6 +22,11 @@ INDEXES: dict[str, list[IndexModel]] = {
     "pandi_profiles": [IndexModel([("profile_id", ASCENDING)], name="profile_id_unique", unique=True)],
     "pandi_messages": [IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)], name="session_created")],
     "pandi_files": [IndexModel([("file_id", ASCENDING)], name="file_id_unique", unique=True)],
+    "pandi_sessions": [
+        IndexModel([("session_id", ASCENDING)], name="session_id_unique", unique=True),
+        IndexModel([("profile_id", ASCENDING), ("updated_at", DESCENDING)], name="profile_updated"),
+    ],
+    "pandi_settings": [IndexModel([("key", ASCENDING)], name="key_unique", unique=True)],
 }
 
 

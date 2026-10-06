@@ -18,6 +18,7 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, db, ensure_indexes
 from routers.pandi import router as pandi_router
+from routers.voice import router as voice_router
 
 
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
@@ -63,6 +64,7 @@ async def get_status_checks():
 
 # Include the router in the main app
 api_router.include_router(pandi_router)
+api_router.include_router(voice_router)
 
 app.add_middleware(
     CORSMiddleware,

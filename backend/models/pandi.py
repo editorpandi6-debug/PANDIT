@@ -1,8 +1,23 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _aware(value: datetime) -> datetime:
+    """Motor returns naive UTC datetimes; make them aware so JSON carries the offset."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+class Stamped(BaseModel):
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def _tz(cls, value: datetime) -> datetime:
+        return _aware(value)
 
 
 class ProfileUpsert(BaseModel):
@@ -10,17 +25,30 @@ class ProfileUpsert(BaseModel):
     avatar_data_url: str | None = Field(default=None, max_length=2_000_000)
 
 
-class Profile(BaseModel):
+class Profile(Stamped):
     profile_id: str
     name: str
     avatar_data_url: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    memory: list[str] = Field(default_factory=list)
+
+
+class MemoryUpdate(BaseModel):
+    memory: list[str] = Field(default_factory=list, max_length=60)
 
 
 class SourceRef(BaseModel):
     url: str
     title: str | None = None
+
+
+class SceneSpec(BaseModel):
+    """Structured 3D scene the LLM asks the Virtual Lab to render."""
+
+    scene: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    title: str = ""
+    steps: list[str] = Field(default_factory=list)
+    stats: list[str] = Field(default_factory=list)
 
 
 class ChatMessage(BaseModel):
@@ -31,7 +59,13 @@ class ChatMessage(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     live_search: bool = False
     sources: list[SourceRef] = Field(default_factory=list)
-    visual_scene: str | None = None
+    scene: SceneSpec | None = None
+    attachments: list[str] = Field(default_factory=list)
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def _tz(cls, value: datetime) -> datetime:
+        return _aware(value)
 
 
 class ChatHistory(BaseModel):
@@ -39,8 +73,19 @@ class ChatHistory(BaseModel):
     messages: list[ChatMessage]
 
 
+class ChatSession(Stamped):
+    session_id: str
+    profile_id: str
+    title: str
+
+
+class SessionRename(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+
 class ChatStreamRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=120)
+    profile_id: str | None = Field(default=None, max_length=120)
     message: str = Field(min_length=1, max_length=12_000)
     language: str = "auto"
     use_live_search: bool = True
@@ -58,3 +103,15 @@ class FileUploadResponse(BaseModel):
 class TodayResponse(BaseModel):
     today: str
     utc_timestamp: datetime
+
+
+class VoiceStatus(BaseModel):
+    configured: bool
+    provider: Literal["elevenlabs", "browser"]
+    voice_id: str | None = None
+    cloned: bool = False
+    detail: str
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4_000)
