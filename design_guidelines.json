@@ -1,0 +1,101 @@
+{
+  "project_title": "PANDI AI MARK II - Personalized Advanced Neural Digital Intelligence",
+  "creator": "VIGNASHWAR S.",
+  "theme": "Cinematic Red & Obsidian Sci-Fi (PANDI Title Art Signature)",
+  "design_archetype": "THE PERFORMANCE PRO & ELECTRIC NEON (Cinematic Command Center)",
+  "colors": {
+    "background": {
+      "main": "#06060A",
+      "surface": "#0C0D14",
+      "card": "#121420",
+      "glass": "rgba(18, 20, 32, 0.75)",
+      "panel_overlay": "rgba(8, 9, 15, 0.88)"
+    },
+    "brand_primary": {
+      "crimson_red": "#FF1E42",
+      "plasma_red": "#E6002E",
+      "core_glow": "#FF3B5C",
+      "amber_accent": "#FF9500",
+      "cyan_hud": "#00F0FF"
+    },
+    "text": {
+      "primary": "#F4F5FB",
+      "secondary": "#9E819C",
+      "muted": "#8A8D9B",
+      "highlight": "#FF1E42"
+    },
+    "borders": {
+      "subtle": "rgba(255, 30, 66, 0.18)",
+      "active": "rgba(255, 30, 66, 0.55)",
+      "hud_line": "rgba(0, 240, 255, 0.25)"
+    },
+    "forbidden_colors": ["#7351B7", "#1B93A4"]
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Space Grotesk, Orbitron, sans-serif",
+      "body": "Outfit, Inter, sans-serif",
+      "code_mono": "JetBrains Mono, IBM Plex Mono, monospace"
+    },
+    "scale": {
+      "hero_title": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-black",
+      "section_title": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "card_title": "text-lg sm:text-xl font-semibold",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "hud_label": "text-xs font-mono uppercase tracking-[0.2em] text-red-400/90"
+    }
+  },
+  "visual_enhancers": {
+    "glow": "drop-shadow-[0_0_15px_rgba(255,30,66,0.4)]",
+    "reactor_glow": "box-shadow: 0 0 35px rgba(255, 30, 66, 0.65), inset 0 0 20px rgba(255, 59, 92, 0.8)",
+    "glassmorphism": "backdrop-blur-xl bg-[#0C0D14]/80 border border-[#FF1E42]/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)]",
+    "hud_scanlines": "background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.25) 50%), linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.01), rgba(0,0,255,0.03))"
+  },
+  "media_assets": {
+    "official_intro_voice_mp3": "https://customer-assets-cm19k8pv.emergentagent.net/job_feee3313-d0c0-4676-bacb-c576a9e7f582/artifacts/d36069a5e455a03a_Prototype-2026-10-06-09-44-i-am-paandi-personalized-advanced-neural-data-in%20%281%29.mp3",
+    "official_title_artwork_mp4": "https://customer-assets-cm19k8pv.emergentagent.net/job_feee3313-d0c0-4676-bacb-c576a9e7f582/artifacts/920bea1d75fb9cfe_Pandi_AI_Mark_II_title_20261006095531.mp4",
+    "reactor_background": "https://images.unsplash.com/photo-1652026294301-a79f8eb1ecfe?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "hud_interface_bg": "https://images.unsplash.com/photo-1720962158937-7ea890052166?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "space_solar_bg": "https://images.unsplash.com/photo-1781798399338-1b2e51245f20?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "three_d_explainer_engine": {
+    "primary_feature_rule": "3D visualization is the PRIMARY educational feature. It must be interactive, mathematically accurate, smooth, and accompanied by clean info panels.",
+    "solar_system": {
+      "central_body": "Sun with solar flare particle shader and dynamic bloom",
+      "planets_order": ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune"],
+      "dwarf_planet": "Pluto (Must NEVER be listed among the 8 primary planets, identified distinctly as Dwarf Planet when discussed)",
+      "details": {
+        "Earth": "Includes Earth's Moon orbiting Earth",
+        "Saturn": "Includes detailed 3D ring system with orbital tilt",
+        "Orbital_Paths": "Visible semi-transparent concentric orbital rings with label toggles"
+      },
+      "controls": ["Rotate", "Zoom", "Pan", "Reset View", "Fullscreen", "Labels On/Off", "Animation Play/Pause", "Orbital Speed Slider"]
+    },
+    "other_scientific_explaining": {
+      "physics": "Vector fields, pendulum mechanics, gravitational trajectories",
+      "chemistry": "3D molecular structures (e.g. H2O, Caffeine, Benzene ring) with rotatable bonds",
+      "biology": "DNA Double Helix with base pair color coding",
+      "math_geometry": "3D coordinate graphs, parametric surfaces, vectors"
+    }
+  },
+  "first_time_onboarding_flow": [
+    "Step 1: PANDI AI MARK II title reveal with red plasma glow and official MP4 video background",
+    "Step 2: Ask user 'What should I call you?' text input with avatar upload option",
+    "Step 3: Play official PANDI AI introduction voice track (with skip/finish controls)",
+    "Step 4: Request Microphone permission for voice assistant mode",
+    "Step 5: Smooth entry to main PANDI Command Dashboard"
+  ],
+  "general_ui_ux_guidelines": {
+    "testing_attribute": "ALL interactive buttons, inputs, modals, audio triggers, 3D controls, and chat elements MUST include data-testid in kebab-case format (e.g., data-testid='virtual-3d-button', data-testid='voice-mic-trigger', data-testid='planet-select-mars')",
+    "responsiveness": "Mobile-first layout with smooth WebXR/Canvas fallbacks on unsupported mobile browsers",
+    "accessibility": "High contrast text overlays on dark glass backgrounds, keyboard navigable 3D control shortcuts"
+  },
+  "instructions_to_main_agent": [
+    "Implement the primary interactive PANDI 3D Explainer Engine using Three.js / React Three Fiber seamlessly inside the React application.",
+    "Ensure exact compliance with the 8 planets rule (Mercury to Neptune) plus Earth's Moon and Saturn's rings.",
+    "Place the glowing central PANDI reactor face/helmet with circular animated pulse rings prominently in the interface.",
+    "Integrate live streaming text chat, dynamic server date anchoring, voice synthesis/recognition fallback, file drag-and-drop analysis, and conversation history.",
+    "Keep About modal showing: PANDI AI MARK II | Personalized Advanced Neural Digital Intelligence | Created by VIGNASHWAR S.",
+    "Ensure every single interactive element has a valid data-testid attribute."
+  ]
+}

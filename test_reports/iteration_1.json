@@ -1,0 +1,20 @@
+{
+  "passed": 11,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {"criterion":"Profile persistence and validation","name":"profile-round-trip","lane":"backend","status":"passed","evidence":"HTTP PUT /api/pandi/profile/{id} returned 200 with created fixture; GET returned the same name; missing profile returned 404."},
+    {"criterion":"Text AI and date awareness","name":"today-date-chat","lane":"backend","status":"passed","evidence":"HTTP GET /api/pandi/today returned 200 with UTC date; POST /api/pandi/chat/stream returned SSE done content anchored to that date."},
+    {"criterion":"Files and conversation history","name":"files-and-history","lane":"backend","status":"passed","evidence":"HTTP POST /api/pandi/files returned 200 for text fixture; empty returned 400 and unsupported MIME returned 415; chat history GET returned created user and assistant rows."},
+    {"criterion":"First-run onboarding","name":"onboarding-reaches-main","lane":"browser","status":"passed","evidence":"Public preview flow skipped intro, saved name, reached optional mic step, entered main interface, and displayed personalized welcome."},
+    {"criterion":"3D showcase cards","name":"showcase-scenes-open","lane":"browser","status":"passed","evidence":"Main interface showed exactly four showcase cards; each opened the explainer modal with the interactive canvas."},
+    {"criterion":"Accurate Solar System","name":"solar-system-accuracy","lane":"browser","status":"passed","evidence":"Solar System modal exposed Mercury through Neptune selectors in order, Earth facts, educational scale note, and no Pluto."},
+    {"criterion":"3D controls and fallback","name":"explainer-controls-fallback","lane":"browser","status":"passed","evidence":"Rotate/pan, zoom, labels, play/pause, speed, fullscreen, and Virtual mode were exercised; modal remained usable on desktop fallback."},
+    {"criterion":"Text AI and date awareness","name":"chat-date-awareness","lane":"browser","status":"passed","evidence":"Text question produced assistant response containing server-anchored Today is text; live web indicator and system date were visible."},
+    {"criterion":"Files and conversation history","name":"file-upload-recovery","lane":"browser","status":"passed","evidence":"Supported text upload rendered removable chip, removal recovered, date chat completed, and message remained after refresh."},
+    {"criterion":"Official voice boundary","name":"official-voice-boundary","lane":"browser","status":"passed","evidence":"Intro and main replay audio controls were present; UI identified Intro asset and explicitly stated it never substitutes a system voice. Initial persisted-profile setup was corrected and rerun passed."},
+    {"criterion":"Profile and About","name":"profile-about-reset","lane":"browser","status":"passed","evidence":"Personalized profile rendered, About modal displayed all exact required strings, and profile reset returned to onboarding."}
+  ]
+}
