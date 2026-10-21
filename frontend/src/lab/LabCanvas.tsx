@@ -5,7 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { LabContext, Lights } from "./holo";
-import type { SelectInfo } from "./holo";
+import type { RenderMode, SelectInfo } from "./holo";
 import { Eclipse, EarthSeasons, GenericHolo, MoonPhases, SolarSystem } from "./scenes/Astronomy";
 import { Cell, DNA, Heart } from "./scenes/Biology";
 import { Atom, Molecule, StatesOfMatter } from "./scenes/Chemistry";
@@ -21,6 +21,8 @@ export interface LabCanvasProps {
   speed: number;
   autoRotate: boolean;
   toggle: boolean;
+  renderMode: RenderMode;
+  explode: number;
   activeStep: number;
   resetSignal: number;
   onSelect: (info: SelectInfo | null) => void;
@@ -112,8 +114,8 @@ function Controls({ autoRotate, resetSignal, scene }: { autoRotate: boolean; res
   return <OrbitControls ref={ref} makeDefault enableDamping dampingFactor={0.08} autoRotate={autoRotate && !is2D} autoRotateSpeed={0.8} minDistance={2} maxDistance={60} />;
 }
 
-export default function LabCanvas({ spec, playing, speed, autoRotate, toggle, activeStep, resetSignal, onSelect, onError }: LabCanvasProps) {
-  const ctx = useMemo(() => ({ playing, speed, activeStep, toggle, select: onSelect }), [playing, speed, activeStep, toggle, onSelect]);
+export default function LabCanvas({ spec, playing, speed, autoRotate, toggle, renderMode, explode, activeStep, resetSignal, onSelect, onError }: LabCanvasProps) {
+  const ctx = useMemo(() => ({ playing, speed, activeStep, toggle, renderMode, explode, select: onSelect }), [playing, speed, activeStep, toggle, renderMode, explode, onSelect]);
   const camera = cameraFor(spec.scene);
   return (
     <Canvas

@@ -81,5 +81,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# Belt-and-braces: any unhandled exception becomes a clean JSON 500 instead of a raw
+# traceback/blank response, so the frontend can always show a recovery message.
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Something went wrong on PANDI's end. Please try again."})
+
+
 # Keep router inclusion last so every route registered above is served under /api.
 app.include_router(api_router)

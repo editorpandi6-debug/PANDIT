@@ -9,7 +9,8 @@ import type { Profile, ProfileUpsert } from "@/lib/types";
 export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
   const [name, setName] = useState("");
   const [typed, setTyped] = useState("");
-  const line = "Welcome to PANDI AI Mark II. May I know your name?";
+  const [error, setError] = useState<string | null>(null);
+  const line = "Welcome to PANDI AI Mark II. What should I call you?";
 
   useEffect(() => {
     let i = 0;
@@ -25,10 +26,14 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const value = name.trim();
-    if (!value) return;
+    if (value.length < 2 || value.length > 20) {
+      setError("Please enter 2–20 characters.");
+      return;
+    }
+    setError(null);
     const profileId = storage.get(KEYS.profileId) ?? newId();
     const now = new Date().toISOString();
-    const local: Profile = { profile_id: profileId, name: value, avatar_data_url: null, memory: [], created_at: now, updated_at: now };
+    const local: Profile = { profile_id: profileId, name: value, avatar_data_url: null, memory: [], voice_mode: "text", theme: "agni", created_at: now, updated_at: now };
     storage.set(KEYS.profileId, profileId);
     storage.set(KEYS.name, value);
     const body: ProfileUpsert = { name: value };
@@ -44,12 +49,12 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
         <h1 className="font-heading text-2xl font-bold tracking-[0.22em] text-white glow-text sm:text-3xl" data-testid="name-screen-title">
           PANDI AI MARK II
         </h1>
-        <p className="mt-2 font-heading text-[11px] tracking-[0.42em] text-[#ff2a4a]" data-testid="name-screen-subtitle">
+        <p className="mt-2 font-heading text-[11px] tracking-[0.42em] text-[#ff8a1f]" data-testid="name-screen-subtitle">
           THE HOLOGRAM INTELLIGENCE
         </p>
-        <p className="mt-8 min-h-[1.6em] text-[15px] text-[#ffd9de]" data-testid="name-screen-prompt">
+        <p className="mt-8 min-h-[1.6em] text-[15px] text-[#ffe3b8]" data-testid="name-screen-prompt">
           {typed}
-          <span className="ml-0.5 inline-block w-[2px] bg-[#ff2a4a] align-middle animate-blink" style={{ height: "1em" }} />
+          <span className="ml-0.5 inline-block w-[2px] bg-[#ff8a1f] align-middle animate-blink" style={{ height: "1em" }} />
         </p>
         <form onSubmit={submit} className="hud-panel hud-corners mt-6 flex w-full flex-col gap-3 rounded-md p-4 sm:flex-row">
           <span className="hud-c" />
@@ -57,22 +62,28 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={80}
-            placeholder="Enter your name"
+            minLength={2}
+            maxLength={20}
+            placeholder="Enter your name (2-20 characters)"
             aria-label="Your name"
             data-testid="name-input"
-            className="h-11 flex-1 rounded border border-[#ff2a4a]/35 bg-black/50 px-3 font-sans text-white placeholder:text-[#7d4f58] focus:border-[#ff2a4a] focus:outline-none focus:shadow-[0_0_14px_rgba(255, 42, 74,0.35)]"
+            className="h-11 flex-1 rounded border border-[#ff8a1f]/35 bg-black/50 px-3 font-sans text-white placeholder:text-[#7a4a22] focus:border-[#ff8a1f] focus:outline-none focus:shadow-[0_0_14px_rgba(255, 138, 31,0.35)]"
           />
           <button
             type="submit"
-            disabled={!name.trim()}
+            disabled={name.trim().length < 2}
             data-testid="name-continue-button"
-            className="h-11 rounded border border-[#ff2a4a] bg-[#ff2a4a]/15 px-6 font-heading text-xs tracking-[0.25em] text-white hover:bg-[#ff2a4a]/30 hover:shadow-[0_0_18px_rgba(255, 42, 74,0.5)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-11 rounded border border-[#ff8a1f] bg-[#ff8a1f]/15 px-6 font-heading text-xs tracking-[0.25em] text-white hover:bg-[#ff8a1f]/30 hover:shadow-[0_0_18px_rgba(255, 138, 31,0.5)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             CONTINUE
           </button>
         </form>
-        <p className="mt-6 text-[10px] tracking-[0.3em] text-[#7d4f58]">PERSONALIZED ADVANCED NEURAL DIGITAL INTELLIGENCE</p>
+        {error && (
+          <p className="mt-3 text-xs text-[#ff9d9d]" data-testid="name-error">
+            {error}
+          </p>
+        )}
+        <p className="mt-6 text-[10px] tracking-[0.3em] text-[#7a4a22]">PERSONALIZED ADVANCED NEURAL DIGITAL INTELLIGENCE</p>
       </div>
     </div>
   );

@@ -15,12 +15,12 @@ function Axes2D({ range }: { range: number }) {
   }, [range]);
   return (
     <group>
-      <Line points={[[-range - 0.5, 0, 0], [range + 0.5, 0, 0]]} color="#ffb0bc" lineWidth={1.5} />
-      <Line points={[[0, -range - 0.5, 0], [0, range + 0.5, 0]]} color="#ffb0bc" lineWidth={1.5} />
+      <Line points={[[-range - 0.5, 0, 0], [range + 0.5, 0, 0]]} color="#ffd27a" lineWidth={1.5} />
+      <Line points={[[0, -range - 0.5, 0], [0, range + 0.5, 0]]} color="#ffd27a" lineWidth={1.5} />
       {ticks.map((v) => (
         <group key={v}>
-          <Line points={[[v, -0.12, 0], [v, 0.12, 0]]} color="#ffb0bc" />
-          <Line points={[[-0.12, v, 0], [0.12, v, 0]]} color="#ffb0bc" />
+          <Line points={[[v, -0.12, 0], [v, 0.12, 0]]} color="#ffd27a" />
+          <Line points={[[-0.12, v, 0], [0.12, v, 0]]} color="#ffd27a" />
           <Label position={[v, -0.5, 0]} small>
             {v}
           </Label>
@@ -35,7 +35,7 @@ function Axes2D({ range }: { range: number }) {
       <Label position={[0, range + 1, 0]} small>
         y
       </Label>
-      <gridHelper args={[range * 2, range * 2, "#5a1020", "#3a0a12"]} rotation={[Math.PI / 2, 0, 0]} />
+      <gridHelper args={[range * 2, range * 2, "#5a2a08", "#3a1a06"]} rotation={[Math.PI / 2, 0, 0]} />
     </group>
   );
 }
@@ -102,7 +102,7 @@ function Surface3D({ expr, range }: { expr: string; range: number }) {
     const positions: number[] = [];
     const colors: number[] = [];
     const indices: number[] = [];
-    const lo = new Color("#8a1020");
+    const lo = new Color("#c2300a");
     const hi = new Color("#ffffff");
     let minZ = Infinity;
     let maxZ = -Infinity;
@@ -146,9 +146,9 @@ function Surface3D({ expr, range }: { expr: string; range: number }) {
       <mesh geometry={geometry}>
         <meshBasicMaterial color={HOLO} wireframe transparent opacity={0.12} />
       </mesh>
-      <Line points={[[-range, 0, 0], [range, 0, 0]]} color="#ffb0bc" />
-      <Line points={[[0, 0, -range], [0, 0, range]]} color="#ffb0bc" />
-      <Line points={[[0, -range / 2, 0], [0, range / 2, 0]]} color="#ffb0bc" />
+      <Line points={[[-range, 0, 0], [range, 0, 0]]} color="#ffd27a" />
+      <Line points={[[0, 0, -range], [0, 0, range]]} color="#ffd27a" />
+      <Line points={[[0, -range / 2, 0], [0, range / 2, 0]]} color="#ffd27a" />
       <Label position={[range + 0.6, 0, 0]} small>
         x
       </Label>

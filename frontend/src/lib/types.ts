@@ -5,6 +5,8 @@ export interface Profile {
   name: string;
   avatar_data_url: string | null;
   memory: string[];
+  voice_mode: "voice" | "text";
+  theme: "agni" | "vajra";
   created_at: string;
   updated_at: string;
 }
@@ -12,6 +14,8 @@ export interface Profile {
 export interface ProfileUpsert {
   name: string;
   avatar_data_url?: string | null;
+  voice_mode?: "voice" | "text" | null;
+  theme?: "agni" | "vajra" | null;
 }
 
 export interface MemoryUpdate {
@@ -71,6 +75,7 @@ export interface CustomObject {
   speed?: number;
   wire?: boolean;
   opacity?: number;
+  info?: string;
 }
 
 export interface ChatStreamRequest {
@@ -78,8 +83,15 @@ export interface ChatStreamRequest {
   profile_id: string | null;
   message: string;
   language?: string;
+  model?: string;
   use_live_search?: boolean;
   file_ids?: string[];
+}
+
+export interface ModelInfo {
+  id: string;
+  provider: string;
+  label: string;
 }
 
 export interface FileUploadResponse {
@@ -105,4 +117,12 @@ export interface VoiceStatus {
 
 export interface TTSRequest {
   text: string;
+}
+
+export interface TranscribeResponse {
+  text: string;
+}
+
+export interface IntroVideoResponse {
+  video_url: string;
 }

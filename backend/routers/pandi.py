@@ -2,7 +2,9 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
@@ -26,6 +28,7 @@ from models.pandi import (
     ChatSession,
     ChatStreamRequest,
     FileUploadResponse,
+    IntroVideoResponse,
     MemoryUpdate,
     Profile,
     ProfileUpsert,
@@ -40,6 +43,36 @@ router = APIRouter(prefix="/pandi", tags=["pandi"])
 
 UPLOAD_DIR = Path("/tmp/pandi_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+DEFAULT_INTRO_VIDEO = "https://customer-assets-gfyr7b9c.emergentagent.net/job_pandi-ai-mark2/artifacts/014c65974f9a29f2_WhatsApp%20Video%202026-10-21%20at%2019.06.55.mp4"
+
+# provider, model — selectable from Settings; all served through the Emergent universal key
+MODELS: dict[str, tuple[str, str]] = {
+    "gpt-5.1": ("openai", "gpt-5.1"),
+    "gemini-3-flash": ("gemini", "gemini-3-flash"),
+    "gemini-3.1-pro-preview": ("gemini", "gemini-3.1-pro-preview"),
+    "claude-sonnet-5-5": ("anthropic", "claude-sonnet-5-5"),
+    "claude-opus-5-5": ("anthropic", "claude-opus-5-5"),
+    "claude-haiku-4-5-20251001": ("anthropic", "claude-haiku-4-5-20251001"),
+}
+DEFAULT_MODEL = "gpt-5.1"
+FALLBACK_MODEL = "gemini-3-flash"
+SEARCH_MODEL = "gemini-3.1-pro-preview"  # live Google Search grounding is Gemini-only
+
+# --- per-user rate limit: a simple in-memory sliding window (reset on restart) ---
+RATE_LIMIT_MAX = 20
+RATE_LIMIT_WINDOW_S = 60
+_rate_log: dict[str, deque] = defaultdict(deque)
+
+
+def _check_rate_limit(key: str) -> None:
+    now = time.time()
+    dq = _rate_log[key]
+    while dq and now - dq[0] > RATE_LIMIT_WINDOW_S:
+        dq.popleft()
+    if len(dq) >= RATE_LIMIT_MAX:
+        raise HTTPException(status_code=429, detail="You're sending messages too quickly. Please wait a few seconds and try again.")
+    dq.append(now)
 
 SCENE_OPEN = "<<<PANDI_SCENE>>>"
 SCENE_CLOSE = "<<<END_SCENE>>>"
@@ -119,6 +152,26 @@ def _scene_fallback(text: str) -> SceneSpec | None:
     return None
 
 
+CREATOR_ANSWER = "I was created by VIGNEASHWAR."
+_CREATOR_RE = re.compile(
+    r"\b(who|whom|whose)\b.*\b(creat|made|make|built|build|develop|design|program|code|own|author|invent|founder|father|behind)|"
+    r"\b(your|ur)\s+(creator|maker|developer|owner|author|inventor|founder|father|builder)\b|"
+    r"\b(creator|maker|developer|owner|author)\s+of\s+(this|you|pandi)|"
+    r"\bwho\s+(is|are)\s+(you|pandi)\s+(by|from)\b",
+    re.I,
+)
+_SPELLING_RE = re.compile(r"\bvign[aeiou]*shw[aeiou]*r(?:\s+s\.?)?\b", re.I)
+
+
+def _is_creator_query(text: str) -> bool:
+    return bool(_CREATOR_RE.search(text))
+
+
+def _enforce_creator_spelling(text: str) -> str:
+    """Hard guard: the creator's name is always spelled VIGNEASHWAR, whatever the model produced."""
+    return _SPELLING_RE.sub("VIGNEASHWAR", text)
+
+
 def _is_date_query(text: str) -> bool:
     lowered = text.lower()
     date_terms = ("today", "current date", "what date", "what day is it", "date today", "what time")
@@ -173,6 +226,17 @@ async def pandi_health() -> dict[str, str]:
     return {"status": "online", "assistant": "PANDI AI MARK II"}
 
 
+@router.get("/models")
+async def list_models() -> list[dict[str, str]]:
+    return [{"id": key, "provider": provider, "label": label} for key, (provider, label) in MODELS.items()]
+
+
+@router.get("/settings/intro-video", response_model=IntroVideoResponse)
+async def get_intro_video() -> IntroVideoResponse:
+    doc = await db.pandi_settings.find_one({"key": "app"}) or {}
+    return IntroVideoResponse(video_url=doc.get("intro_video_url") or DEFAULT_INTRO_VIDEO)
+
+
 @router.get("/today", response_model=TodayResponse)
 async def get_today() -> TodayResponse:
     return TodayResponse(today=today_iso(), utc_timestamp=datetime.now(timezone.utc))
@@ -195,6 +259,8 @@ async def upsert_profile(profile_id: str, input: ProfileUpsert) -> Profile:
         name=input.name.strip(),
         avatar_data_url=input.avatar_data_url,
         memory=current.get("memory", []),
+        voice_mode=input.voice_mode or current.get("voice_mode", "text"),
+        theme=input.theme or current.get("theme", "agni"),
         created_at=current.get("created_at", now),
         updated_at=now,
     )
@@ -314,7 +380,17 @@ async def _stream_chat(request: ChatStreamRequest, file_rows: list[dict]) -> Asy
     context = "\n".join(context_lines[-12:]) or "No earlier turns."
     today = today_iso()
 
-    yield _sse("meta", {"message_id": user_message.id, "today": today, "live_search": should_search, "remembered": remembered})
+    provider, model_name = MODELS.get(request.model, MODELS[DEFAULT_MODEL])
+    if should_search and provider != "gemini":
+        provider, model_name = MODELS[DEFAULT_MODEL]  # live Google Search grounding is Gemini-only
+    yield _sse("meta", {"message_id": user_message.id, "today": today, "live_search": should_search, "remembered": remembered, "model": model_name})
+
+    if _is_creator_query(request.message):
+        assistant_message = ChatMessage(session_id=request.session_id, role="assistant", content=CREATOR_ANSWER)
+        await db.pandi_messages.insert_one(assistant_message.model_dump())
+        yield _sse("delta", {"text": CREATOR_ANSWER})
+        yield _sse("done", {"message_id": assistant_message.id, "content": CREATOR_ANSWER, "sources": [], "scene": None})
+        return
 
     if _is_date_query(request.message):
         answer = f"Today is **{today}** (UTC)."
@@ -331,7 +407,7 @@ async def _stream_chat(request: ChatStreamRequest, file_rows: list[dict]) -> Asy
 
     operator = profile.get("name", "Operator") if profile else "Operator"
     memory_block = "\n".join(f"- {item}" for item in memory_items) or "- (nothing stored yet)"
-    system_message = f"""You are PANDI AI MARK II (Personalized Advanced Neural Digital Intelligence), a holographic lab intelligence created by VIGNASHWAR S.
+    system_message = f"""You are PANDI AI MARK II (Personalized Advanced Neural Digital Intelligence), a holographic lab intelligence created by VIGNEASHWAR
 You speak to your operator, {operator}, in a warm, precise, cinematic-but-clear tone. The current UTC date is {today}; never invent a date.
 Reply in the user's language (preference: {request.language}). Format answers with Markdown (headings, **bold**, lists, LaTeX with $...$ for math).
 
@@ -343,6 +419,8 @@ When a scene block is present keep the explanation SHORT and spoken-friendly (60
 Scientific accuracy is mandatory: the Solar System has exactly 8 planets (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune); Pluto is a dwarf planet. State clearly when a visualization uses an educational (not physical) scale.
 When live web search is used, prefer reliable sources, mention publication timing when available and include source URLs. If you cannot verify current information, say: "I currently don't have live web access, so I can't reliably verify today's information." Never fabricate.
 Never claim to have analyzed a file unless it is actually attached in this turn.
+Confidence rule: if you are not confident in an answer, say "I'm not sure" and explain what would help you verify it, rather than guessing or inventing facts.
+Decision rule: when the user asks you to decide between options (e.g. "which is better", "should I choose X or Y"), list 2-4 concrete options, score each on Cost, Risk and Benefit (Low/Medium/High), then pick ONE option in **bold** and explain the choice in 2-3 neutral sentences.
 
 Operator memory (facts {operator} asked you to remember):
 {memory_block}
@@ -351,67 +429,93 @@ Recent conversation context:
 {context}
 """
 
-    try:
-        chat = LlmChat(api_key=api_key, session_id=f"pandi-{request.session_id}", system_message=system_message).with_model(
-            "gemini", "gemini-3.1-pro-preview"
-        )
-        if should_search:
-            chat = chat.with_tools([{"googleSearch": {}}])
+    candidates: list[tuple[str, str]] = [(provider, model_name)]
+    fallback_pair = MODELS[FALLBACK_MODEL] if not should_search else MODELS[SEARCH_MODEL]
+    if fallback_pair != (provider, model_name):
+        candidates.append(fallback_pair)
 
-        attachments = [
-            FileContentWithMimeType(file_path=row["path"], mime_type=row["mime_type"])
-            for row in file_rows
-            if Path(row["path"]).exists()
-        ]
-        prompt = request.message
-        if should_search:
-            prompt += "\n(Use live search for current information and cite source URLs.)"
-        llm_message = UserMessage(text=prompt, file_contents=attachments or None)
+    parts: list[str] = []
+    scene_emitted: SceneSpec | None = None
+    last_error: Exception | None = None
+    used_model = model_name
 
-        parts: list[str] = []
+    for cand_provider, cand_model in candidates:
+        parts = []
         pending = ""  # text held back until we know whether the reply opens with a scene block
         mode = "detect"  # detect -> scene -> text
-        scene_emitted: SceneSpec | None = None
+        scene_emitted = None
+        try:
+            chat = LlmChat(api_key=api_key, session_id=f"pandi-{request.session_id}", system_message=system_message).with_model(cand_provider, cand_model)
+            if should_search:
+                chat = chat.with_tools([{"googleSearch": {}}])
 
-        async for event in chat.stream_message(llm_message):
-            text = ""
-            if isinstance(event, TextDelta) and event.content:
-                text = event.content
-            elif isinstance(event, StreamDone) and event.content and not parts:
-                text = event.content
-            if not text:
-                continue
-            parts.append(text)
+            attachments = [
+                FileContentWithMimeType(file_path=row["path"], mime_type=row["mime_type"])
+                for row in file_rows
+                if Path(row["path"]).exists()
+            ]
+            prompt = request.message
+            if should_search:
+                prompt += "\n(Use live search for current information and cite source URLs.)"
+            llm_message = UserMessage(text=prompt, file_contents=attachments or None)
 
-            if mode == "text":
-                yield _sse("delta", {"text": text})
-                continue
-            pending += text
-            if mode == "detect":
-                head = pending.lstrip()
-                if head.startswith(SCENE_OPEN):
-                    mode = "scene"
-                elif len(head) >= len(SCENE_OPEN) or (head and not SCENE_OPEN.startswith(head)):
-                    mode = "text"
-                    yield _sse("delta", {"text": pending})
-                    pending = ""
+            async for event in chat.stream_message(llm_message):
+                text = ""
+                if isinstance(event, TextDelta) and event.content:
+                    text = event.content
+                elif isinstance(event, StreamDone) and event.content and not parts:
+                    text = event.content
+                if not text:
                     continue
-                else:
+                parts.append(text)
+
+                if mode == "text":
+                    yield _sse("delta", {"text": _enforce_creator_spelling(text)})
                     continue
-            if mode == "scene" and SCENE_CLOSE in pending:
-                block, _, rest = pending.partition(SCENE_CLOSE)
-                scene_emitted = _parse_scene(block.lstrip()[len(SCENE_OPEN):].strip())
-                if scene_emitted:
-                    yield _sse("scene", scene_emitted.model_dump())
-                mode, pending = "text", ""
-                if rest.strip():
-                    yield _sse("delta", {"text": rest.lstrip("\n")})
+                pending += text
+                if mode == "detect":
+                    head = pending.lstrip()
+                    if head.startswith(SCENE_OPEN):
+                        mode = "scene"
+                    elif len(head) >= len(SCENE_OPEN) or (head and not SCENE_OPEN.startswith(head)):
+                        mode = "text"
+                        yield _sse("delta", {"text": pending})
+                        pending = ""
+                        continue
+                    else:
+                        continue
+                if mode == "scene" and SCENE_CLOSE in pending:
+                    block, _, rest = pending.partition(SCENE_CLOSE)
+                    scene_emitted = _parse_scene(block.lstrip()[len(SCENE_OPEN):].strip())
+                    if scene_emitted:
+                        yield _sse("scene", scene_emitted.model_dump())
+                    mode, pending = "text", ""
+                    if rest.strip():
+                        yield _sse("delta", {"text": rest.lstrip("\n")})
 
-        if pending and mode != "scene":
-            yield _sse("delta", {"text": pending})
+            if pending and mode != "scene":
+                yield _sse("delta", {"text": pending})
+            used_model = cand_model
+            last_error = None
+            break
+        except Exception as exc:  # pragma: no cover - network/provider failure
+            last_error = exc
+            if parts:
+                # Partial text already streamed to the client — switching models now would
+                # duplicate/garble the reply, so stop here instead of silently retrying.
+                break
+            logger.warning("Model %s/%s failed (%s); trying fallback.", cand_provider, cand_model, exc)
+            continue
 
+    if last_error is not None and not parts:
+        logger.exception("All PANDI models failed", exc_info=last_error)
+        yield _sse("error", {"message": "PANDI's AI core and its backup are both unavailable right now. Please retry in a moment."})
+        return
+
+    try:
         raw_answer = "".join(parts).strip()
         answer, parsed = _split_scene(raw_answer)
+        answer = _enforce_creator_spelling(answer)
         scene = scene_emitted or parsed or (_scene_fallback(request.message) if not file_rows else None)
         if scene and scene_emitted is None:
             yield _sse("scene", scene.model_dump())
@@ -446,6 +550,7 @@ Recent conversation context:
 
 @router.post("/chat/stream")
 async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
+    _check_rate_limit(request.profile_id or "anonymous")
     if request.file_ids:
         file_rows = await db.pandi_files.find({"file_id": {"$in": request.file_ids}}).to_list(8)
         if len(file_rows) != len(set(request.file_ids)):

@@ -7,6 +7,9 @@ export const KEYS = {
   voiceSync: "pandi-voice-sync",
   permissionDone: "pandi-permission-done",
   glow: "pandi-theme-glow",
+  model: "pandi-model",
+  interfaceTheme: "pandi-interface-theme", // "agni" | "vajra"
+  onboardingDone: "pandi-onboarding-done", // voice/text + theme steps finished
 } as const;
 
 export const storage = {

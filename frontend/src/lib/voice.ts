@@ -199,12 +199,13 @@ function speakWithBrowser(text: string, myToken: number): Promise<void> {
     const wanted = getPreferredVoice();
     const preferred =
       voices.find((v) => v.name === wanted) ??
-      voices.find((v) => /en-(GB|IN)/i.test(v.lang) && /male|daniel|rishi|george/i.test(v.name)) ??
+      voices.find((v) => /en-(GB|IN|US)/i.test(v.lang) && /daniel|arthur|fred|george|david|male/i.test(v.name)) ??
       voices.find((v) => /^en/i.test(v.lang)) ??
       voices[0];
     if (preferred) u.voice = preferred;
-    u.rate = 1;
-    u.pitch = 0.9;
+    // Jarvis-style: deep, calm, confident — lower pitch, measured pace.
+    u.rate = 0.94;
+    u.pitch = 0.72;
     const total = Math.max(1, text.length);
     u.onboundary = (e) => {
       if (myToken === token) set({ progress: Math.min(1, e.charIndex / total) });

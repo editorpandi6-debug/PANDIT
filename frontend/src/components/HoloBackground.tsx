@@ -16,7 +16,7 @@ export function HoloBackground({ particles = 26 }: { particles?: number }) {
   return (
     <div className="holo-fx pointer-events-none fixed inset-0 overflow-hidden scanlines" aria-hidden data-testid="holo-background">
       <div className="absolute inset-0 holo-grid" />
-      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 35%, rgba(255, 42, 74,0.12), transparent 55%)" }} />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 35%, rgba(255, 138, 31,0.12), transparent 55%)" }} />
       <div className="scan-beam" />
       {dots.map((d, i) => (
         <span key={i} className="particle" style={{ left: d.left, top: d.top, animationDelay: d.delay, animationDuration: d.duration, transform: `scale(${d.scale})` }} />

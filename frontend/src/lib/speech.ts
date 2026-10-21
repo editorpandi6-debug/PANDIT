@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError } from "@/lib/api";
+import type { TranscribeResponse } from "@/lib/types";
 
 interface RecognitionLike {
   lang: string;
@@ -19,24 +21,54 @@ function getCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+async function uploadAndTranscribe(blob: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("file", blob, "recording.webm");
+  const res = await fetch("/api/voice/transcribe", { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(res.status, body);
+  }
+  const data = (await res.json()) as TranscribeResponse;
+  return data.text;
+}
+
+/**
+ * Voice input: native SpeechRecognition where available (live interim text), otherwise tap-to-record
+ * with MediaRecorder → upload → Whisper transcription (server-side, via the Emergent universal key).
+ * Either way the transcript lands in the caller's text box before anything is sent — never auto-replied.
+ */
 export function useSpeechRecognition(onFinal: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<RecognitionLike | null>(null);
-  const supported = getCtor() !== null;
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const nativeSupported = getCtor() !== null;
+  const recorderSupported = typeof MediaRecorder !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
+  const supported = nativeSupported || recorderSupported;
 
-  const stop = useCallback(() => {
-    recRef.current?.stop();
-    setListening(false);
+  const stopRecorder = useCallback(() => {
+    const rec = recorderRef.current;
+    if (!rec) return;
+    if (rec.state !== "inactive") rec.stop();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
-  const start = useCallback(() => {
-    const Ctor = getCtor();
-    if (!Ctor) {
-      setError("Speech recognition is not supported in this browser.");
-      return;
+  const stop = useCallback(() => {
+    if (nativeSupported) {
+      recRef.current?.stop();
+    } else {
+      stopRecorder();
     }
+    setListening(false);
+  }, [nativeSupported, stopRecorder]);
+
+  const startNative = useCallback(() => {
+    const Ctor = getCtor();
+    if (!Ctor) return;
     const rec = new Ctor();
     rec.lang = navigator.language || "en-US";
     rec.interimResults = true;
@@ -70,7 +102,52 @@ export function useSpeechRecognition(onFinal: (text: string) => void) {
     }
   }, [onFinal]);
 
-  useEffect(() => () => recRef.current?.abort(), []);
+  const startRecorder = useCallback(async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        setListening(false);
+        setInterim("Transcribing…");
+        try {
+          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+          const text = await uploadAndTranscribe(blob);
+          setInterim("");
+          if (text.trim()) onFinal(text.trim());
+          else setError("Could not hear any speech. Please try again or type instead.");
+        } catch {
+          setInterim("");
+          setError("Transcription failed. Please type your message instead.");
+        }
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setListening(true);
+    } catch {
+      setError("Microphone access was denied or is unavailable. Text mode is available.");
+      setListening(false);
+    }
+  }, [onFinal]);
+
+  const start = useCallback(() => {
+    if (nativeSupported) startNative();
+    else if (recorderSupported) void startRecorder();
+    else setError("Voice input is not supported in this browser. Text mode is available.");
+  }, [nativeSupported, recorderSupported, startNative, startRecorder]);
+
+  useEffect(
+    () => () => {
+      recRef.current?.abort();
+      stopRecorder();
+    },
+    [stopRecorder],
+  );
 
   return { supported, listening, interim, error, start, stop };
 }

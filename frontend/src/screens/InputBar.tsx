@@ -78,7 +78,7 @@ export function InputBar({ disabled, onSend, onListeningChange }: Props) {
       {(files.length > 0 || speech.interim || speech.error) && (
         <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
           {files.map((f) => (
-            <span key={f.file_id} className="inline-flex items-center gap-1 rounded-sm border border-[#ff2a4a]/40 bg-[#ff2a4a]/10 px-2 py-0.5 text-[11px] text-[#ffd9de]" data-testid="attached-file-chip">
+            <span key={f.file_id} className="inline-flex items-center gap-1 rounded-sm border border-[#ff8a1f]/40 bg-[#ff8a1f]/10 px-2 py-0.5 text-[11px] text-[#ffe3b8]" data-testid="attached-file-chip">
               📎 {f.filename}
               <button type="button" onClick={() => setFiles((list) => list.filter((x) => x.file_id !== f.file_id))} aria-label={`Remove ${f.filename}`} data-testid="remove-attached-file">
                 <X size={11} />
@@ -86,12 +86,12 @@ export function InputBar({ disabled, onSend, onListeningChange }: Props) {
             </span>
           ))}
           {speech.interim && (
-            <span className="text-[11px] italic text-[#ffb0bc] animate-pulse" data-testid="speech-interim">
+            <span className="text-[11px] italic text-[#ffd27a] animate-pulse" data-testid="speech-interim">
               {speech.interim}…
             </span>
           )}
           {speech.error && (
-            <span className="text-[11px] text-[#ffb070]" data-testid="speech-error">
+            <span className="text-[11px] text-[#ff9d9d]" data-testid="speech-error">
               {speech.error}
             </span>
           )}
@@ -106,7 +106,7 @@ export function InputBar({ disabled, onSend, onListeningChange }: Props) {
           title="Attach file"
           aria-label="Attach file"
           data-testid="attach-file-button"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[#ff2a4a]/30 bg-black/40 text-[#ffb0bc] hover:border-[#ff2a4a] hover:text-white disabled:opacity-50"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[#ff8a1f]/30 bg-black/40 text-[#ffd27a] hover:border-[#ff8a1f] hover:text-white disabled:opacity-50"
         >
           <Paperclip size={16} className={uploading ? "animate-pulse" : ""} />
         </button>
@@ -118,7 +118,7 @@ export function InputBar({ disabled, onSend, onListeningChange }: Props) {
           placeholder={speech.listening ? "Listening…" : "Ask PANDI anything — science, maths, files, today's news…"}
           aria-label="Message"
           data-testid="chat-input"
-          className="max-h-40 min-h-10 flex-1 resize-none rounded border border-[#ff2a4a]/30 bg-black/50 px-3 py-2.5 text-[15px] text-white placeholder:text-[#7d4f58] focus:border-[#ff2a4a] focus:outline-none focus:shadow-[0_0_14px_rgba(255, 42, 74,0.3)]"
+          className="max-h-40 min-h-10 flex-1 resize-none rounded border border-[#ff8a1f]/30 bg-black/50 px-3 py-2.5 text-[15px] text-white placeholder:text-[#7a4a22] focus:border-[#ff8a1f] focus:outline-none focus:shadow-[0_0_14px_rgba(255, 138, 31,0.3)]"
           style={{ fieldSizing: "content" } as React.CSSProperties}
         />
         <button
@@ -128,12 +128,12 @@ export function InputBar({ disabled, onSend, onListeningChange }: Props) {
           aria-label={speech.listening ? "Stop listening" : "Speak"}
           data-testid="mic-button"
           data-listening={speech.listening}
-          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border ${speech.listening ? "border-[#ff7a00] bg-[#ff7a00]/20 text-white animate-reactor-pulse" : "border-[#ff2a4a]/30 bg-black/40 text-[#ffb0bc] hover:border-[#ff2a4a] hover:text-white"}`}
+          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border ${speech.listening ? "border-[#ff3b3b] bg-[#ff3b3b]/20 text-white animate-reactor-pulse" : "border-[#ff8a1f]/30 bg-black/40 text-[#ffd27a] hover:border-[#ff8a1f] hover:text-white"}`}
         >
           {speech.listening ? <MicOff size={16} /> : <Mic size={16} />}
         </button>
         {voice.status !== "idle" ? (
-          <button type="button" onClick={stopSpeaking} title="Stop speaking" aria-label="Stop speaking" data-testid="stop-speaking-button" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[#ff7a00]/60 bg-[#ff7a00]/15 text-[#ffb070] hover:bg-[#ff7a00]/30">
+          <button type="button" onClick={stopSpeaking} title="Stop speaking" aria-label="Stop speaking" data-testid="stop-speaking-button" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[#ff3b3b]/60 bg-[#ff3b3b]/15 text-[#ff9d9d] hover:bg-[#ff3b3b]/30">
             <Square size={14} />
           </button>
         ) : (
@@ -144,7 +144,7 @@ export function InputBar({ disabled, onSend, onListeningChange }: Props) {
             title="Send"
             aria-label="Send"
             data-testid="send-button"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[#ff2a4a] bg-[#ff2a4a]/20 text-white hover:bg-[#ff2a4a]/40 hover:shadow-[0_0_16px_rgba(255, 42, 74,0.5)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[#ff8a1f] bg-[#ff8a1f]/20 text-white hover:bg-[#ff8a1f]/40 hover:shadow-[0_0_16px_rgba(255, 138, 31,0.5)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <SendHorizonal size={16} />
           </button>

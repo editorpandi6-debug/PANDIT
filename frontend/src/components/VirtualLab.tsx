@@ -1,11 +1,11 @@
 // Virtual Lab viewer: header, 3D canvas (lazy), controls, stat chips, steps that highlight in sync with the voice.
 import { Component, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
-import { Expand, Gauge, Layers, Minimize2, Pause, Play, RefreshCw, RotateCw, Shrink } from "lucide-react";
+import { Box, Expand, Gauge, Layers, MessageCircleQuestion, Minimize2, Pause, Play, RefreshCw, RotateCw, Scan, Shrink } from "lucide-react";
 import { ArcReactor } from "@/components/ArcReactor";
 import { useVoice } from "@/lib/voice";
 import type { SceneSpec } from "@/lib/types";
-import type { SelectInfo } from "@/lab/holo";
+import type { RenderMode, SelectInfo } from "@/lab/holo";
 
 const LabCanvas = lazy(() => import("@/lab/LabCanvas"));
 
@@ -40,15 +40,27 @@ function ToolButton({ onClick, label, active, children, testId }: { onClick: () 
       title={label}
       aria-label={label}
       data-testid={testId}
-      className={`inline-flex h-7 w-7 items-center justify-center rounded border text-[#ffb0bc] hover:bg-[#ff2a4a]/15 hover:text-white ${active ? "border-[#ff2a4a] bg-[#ff2a4a]/20 text-white" : "border-[#ff2a4a]/30 bg-black/40"}`}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded border text-[#ffd27a] hover:bg-[#ff8a1f]/15 hover:text-white ${active ? "border-[#ff8a1f] bg-[#ff8a1f]/20 text-white" : "border-[#ff8a1f]/30 bg-black/40"}`}
     >
       {children}
     </button>
   );
 }
 
-export function VirtualLab({ spec, messageId, tall = false }: { spec: SceneSpec; messageId: string; tall?: boolean }) {
+interface VirtualLabProps {
+  spec: SceneSpec;
+  messageId: string;
+  tall?: boolean;
+  /** ask PANDI to explain the selected part */
+  onExplain?: (part: string, topic: string) => void;
+}
+
+const MODES: RenderMode[] = ["solid", "wire", "xray"];
+
+export function VirtualLab({ spec, messageId, tall = false, onExplain }: VirtualLabProps) {
   const [playing, setPlaying] = useState(true);
+  const [renderMode, setRenderMode] = useState<RenderMode>("solid");
+  const [explode, setExplode] = useState(0);
   const [autoRotate, setAutoRotate] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [toggle, setToggle] = useState(false);
@@ -113,10 +125,10 @@ export function VirtualLab({ spec, messageId, tall = false }: { spec: SceneSpec;
       className={`hud-panel hud-corners ${tall ? "h-full" : "my-3"} overflow-hidden rounded-md ${fullscreen && !document.fullscreenElement ? "fixed inset-2 z-50" : ""} ${document.fullscreenElement === box.current ? "flex h-screen flex-col bg-black" : ""}`}
     >
       <span className="hud-c" />
-      <div className="flex items-center justify-between gap-2 border-b border-[#ff2a4a]/20 bg-black/40 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-[#ff2a4a] shadow-[0_0_8px_#ff2a4a] animate-blink" />
-          <h3 className="truncate font-heading text-[11px] tracking-[0.2em] text-[#ffb0bc] glow-text" data-testid="virtual-lab-title">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-[#ff8a1f] shadow-[0_0_8px_#ff8a1f] animate-blink" />
+          <h3 className="truncate font-heading text-[11px] tracking-[0.2em] text-[#ffd27a] glow-text" data-testid="virtual-lab-title">
             VIRTUAL LAB – {title} 3D PROJECTION
           </h3>
         </div>
@@ -135,6 +147,9 @@ export function VirtualLab({ spec, messageId, tall = false }: { spec: SceneSpec;
               <Layers size={14} />
             </ToolButton>
           )}
+          <ToolButton onClick={() => setRenderMode((m) => MODES[(MODES.indexOf(m) + 1) % MODES.length])} label={`Render: ${renderMode} (click to cycle solid / wireframe / x-ray)`} active={renderMode !== "solid"} testId="lab-render-mode">
+            {renderMode === "wire" ? <Box size={14} /> : renderMode === "xray" ? <Scan size={14} /> : <Layers size={14} className="opacity-70" />}
+          </ToolButton>
           <ToolButton onClick={() => setResetSignal((n) => n + 1)} label="Reset view" testId="lab-reset-view">
             <RefreshCw size={14} />
           </ToolButton>
@@ -144,14 +159,14 @@ export function VirtualLab({ spec, messageId, tall = false }: { spec: SceneSpec;
         </div>
       </div>
 
-      <div className={`relative ${fullscreen ? "flex-1" : tall ? "h-[46vh] min-h-[300px] sm:h-[56vh]" : "h-[300px] sm:h-[360px]"} bg-[radial-gradient(ellipse_at_center,rgba(255, 42, 74,0.08),transparent_70%)]`} data-testid="lab-viewport">
+      <div className={`relative ${fullscreen ? "flex-1" : tall ? "h-[46vh] min-h-[300px] sm:h-[56vh]" : "h-[300px] sm:h-[360px]"} bg-[radial-gradient(ellipse_at_center,rgba(255, 138, 31,0.08),transparent_70%)]`} data-testid="lab-viewport">
         {error || !webglOk ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center" data-testid="lab-fallback">
             <ArcReactor size={48} mode="idle" testId="lab-fallback-reactor" />
-            <p className="font-heading text-[11px] tracking-widest text-[#ffb070]">3D PROJECTION UNAVAILABLE</p>
-            <p className="text-xs text-[#d9a6ae]">{error ?? "WebGL is not available on this device. The text explanation below is complete."}</p>
+            <p className="font-heading text-[11px] tracking-widest text-[#ff9d9d]">3D PROJECTION UNAVAILABLE</p>
+            <p className="text-xs text-[#d9a66a]">{error ?? "WebGL is not available on this device. The text explanation below is complete."}</p>
             {error && (
-              <button type="button" className="mt-1 rounded border border-[#ff2a4a]/40 px-3 py-1 text-xs text-[#ffb0bc] hover:bg-[#ff2a4a]/15" onClick={() => setError(null)} data-testid="lab-retry">
+              <button type="button" className="mt-1 rounded border border-[#ff8a1f]/40 px-3 py-1 text-xs text-[#ffd27a] hover:bg-[#ff8a1f]/15" onClick={() => setError(null)} data-testid="lab-retry">
                 Retry projection
               </button>
             )}
@@ -162,48 +177,59 @@ export function VirtualLab({ spec, messageId, tall = false }: { spec: SceneSpec;
               fallback={
                 <div className="flex h-full flex-col items-center justify-center gap-3" data-testid="lab-loading">
                   <ArcReactor size={56} mode="thinking" testId="lab-loading-reactor" />
-                  <p className="font-heading text-[11px] tracking-[0.25em] text-[#ffb0bc] animate-pulse">PREPARING YOUR VIRTUAL EXPLANATION…</p>
+                  <p className="font-heading text-[11px] tracking-[0.25em] text-[#ffd27a] animate-pulse">PREPARING YOUR VIRTUAL EXPLANATION…</p>
                 </div>
               }
             >
-              <LabCanvas spec={spec} playing={playing} speed={speed} autoRotate={autoRotate} toggle={toggle} activeStep={activeStep} resetSignal={resetSignal} onSelect={onSelect} onError={onError} />
+              <LabCanvas spec={spec} playing={playing} speed={speed} autoRotate={autoRotate} toggle={toggle} renderMode={renderMode} explode={explode} activeStep={activeStep} resetSignal={resetSignal} onSelect={onSelect} onError={onError} />
             </Suspense>
           </LabBoundary>
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-[#a67a84]">Projection paused while off-screen</div>
+          <div className="flex h-full items-center justify-center text-xs text-[#a8713a]">Projection paused while off-screen</div>
         )}
 
         {selected && !error && (
           <div className="hud-panel absolute left-3 top-3 max-w-[240px] rounded px-3 py-2 text-xs animate-fade-up" data-testid="lab-info-panel">
             <div className="mb-1 flex items-center justify-between gap-3">
               <p className="font-heading text-[11px] tracking-widest text-white">{selected.title}</p>
-              <button type="button" onClick={() => setSelected(null)} className="text-[#ffb0bc] hover:text-white" aria-label="Close info" data-testid="lab-info-close">
+              <button type="button" onClick={() => setSelected(null)} className="text-[#ffd27a] hover:text-white" aria-label="Close info" data-testid="lab-info-close">
                 <Minimize2 size={12} />
               </button>
             </div>
-            <ul className="space-y-0.5 text-[#ffd9de]">
+            <ul className="space-y-0.5 text-[#ffe3b8]">
               {selected.lines.map((l) => (
                 <li key={l}>• {l}</li>
               ))}
             </ul>
+            {onExplain && (
+              <button type="button" onClick={() => onExplain(selected.title, spec.title || spec.scene)} data-testid="lab-explain-part" className="mt-2 inline-flex items-center gap-1 rounded border border-[#ff8a1f]/60 bg-[#ff8a1f]/15 px-2 py-1 font-heading text-[9px] tracking-widest text-white hover:bg-[#ff8a1f]/30">
+                <MessageCircleQuestion size={11} /> ASK PANDI
+              </button>
+            )}
           </div>
         )}
-        <p className="pointer-events-none absolute bottom-2 right-3 text-[10px] tracking-wider text-[#a67a84]">drag · rotate &nbsp; scroll · zoom &nbsp; right-drag · pan</p>
+        <p className="pointer-events-none absolute bottom-2 right-3 text-[10px] tracking-wider text-[#a8713a]">drag · rotate &nbsp; scroll · zoom &nbsp; right-drag · pan</p>
+        {spec.scene === "custom" && !error && (
+          <label className="absolute bottom-2 left-3 flex items-center gap-2 rounded border border-[#ff8a1f]/40 bg-black/60 px-2 py-1 text-[9px] tracking-widest text-[#ffd27a]" data-testid="lab-explode-control">
+            EXPLODE
+            <input type="range" min={0} max={100} value={Math.round(explode * 100)} onChange={(e) => setExplode(Number(e.target.value) / 100)} className="w-24 accent-[#ff8a1f]" aria-label="Exploded view" data-testid="lab-explode-slider" />
+          </label>
+        )}
       </div>
 
       {(spec.stats?.length > 0 || note) && (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ff2a4a]/15 bg-black/30 px-3 py-2" data-testid="lab-stats">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ff8a1f]/15 bg-black/30 px-3 py-2" data-testid="lab-stats">
           {spec.stats?.map((s) => (
-            <span key={s} className="rounded-sm border border-[#ff2a4a]/40 bg-[#ff2a4a]/10 px-2 py-0.5 font-heading text-[10px] tracking-wider text-[#ffd9de]" data-testid="lab-stat-chip">
+            <span key={s} className="rounded-sm border border-[#ff8a1f]/40 bg-[#ff8a1f]/10 px-2 py-0.5 font-heading text-[10px] tracking-wider text-[#ffe3b8]" data-testid="lab-stat-chip">
               {s}
             </span>
           ))}
-          {note && <span className="ml-auto text-[10px] text-[#a67a84]">{note}</span>}
+          {note && <span className="ml-auto text-[10px] text-[#a8713a]">{note}</span>}
         </div>
       )}
 
       {steps.length > 0 && (
-        <ol className="space-y-1 border-t border-[#ff2a4a]/15 px-3 py-2" data-testid="lab-steps">
+        <ol className="space-y-1 border-t border-[#ff8a1f]/15 px-3 py-2" data-testid="lab-steps">
           {steps.map((s, i) => (
             <li key={i}>
               <button
@@ -211,9 +237,9 @@ export function VirtualLab({ spec, messageId, tall = false }: { spec: SceneSpec;
                 onClick={() => setManualStep(i === manualStep ? -1 : i)}
                 data-testid={`lab-step-${i}`}
                 data-active={activeStep === i}
-                className={`flex w-full items-start gap-2 rounded px-2 py-1 text-left text-xs transition-colors ${activeStep === i ? "bg-[#ff2a4a]/20 text-white shadow-[inset_2px_0_0_#ff2a4a]" : "text-[#d9a6ae] hover:bg-[#ff2a4a]/10"}`}
+                className={`flex w-full items-start gap-2 rounded px-2 py-1 text-left text-xs transition-colors ${activeStep === i ? "bg-[#ff8a1f]/20 text-white shadow-[inset_2px_0_0_#ff8a1f]" : "text-[#d9a66a] hover:bg-[#ff8a1f]/10"}`}
               >
-                <span className="font-heading text-[10px] text-[#ff2a4a]">{String(i + 1).padStart(2, "0")}</span>
+                <span className="font-heading text-[10px] text-[#ff8a1f]">{String(i + 1).padStart(2, "0")}</span>
                 <span>{s}</span>
               </button>
             </li>

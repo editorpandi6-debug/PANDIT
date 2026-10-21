@@ -113,6 +113,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
         profile_id: profile.profile_id,
         message: text,
         language: "auto",
+        model: storage.get(KEYS.model) ?? "gpt-5.1",
         use_live_search: storage.get(KEYS.liveSearch) !== "off",
         file_ids: files.map((f) => f.file_id),
       };
@@ -226,18 +227,18 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
   return (
     <div className="screen-enter relative flex h-screen overflow-hidden" data-testid="chat-screen">
       <HoloBackground particles={18} />
-      <div className="relative z-10 hidden w-72 shrink-0 border-r border-[#ff2a4a]/15 lg:block">{sidebar}</div>
+      <div className="relative z-10 hidden w-72 shrink-0 border-r border-[#ff8a1f]/15 lg:block">{sidebar}</div>
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" showCloseButton={false} className="w-80 border-[#ff2a4a]/20 bg-[#0b0206] p-0">
+        <SheetContent side="left" showCloseButton={false} className="w-80 border-[#ff8a1f]/20 bg-[#050302] p-0">
           <SheetTitle className="sr-only">Menu</SheetTitle>
           {sidebar}
         </SheetContent>
       </Sheet>
 
       <main className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-3 border-b border-[#ff2a4a]/15 bg-[#050204]/70 px-3 py-2 backdrop-blur sm:px-5" data-testid="chat-header">
+        <header className="flex items-center justify-between gap-3 border-b border-[#ff8a1f]/15 bg-[#000000]/70 px-3 py-2 backdrop-blur sm:px-5" data-testid="chat-header">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu" data-testid="menu-button" className="rounded border border-[#ff2a4a]/30 p-2 text-[#ffb0bc] hover:border-[#ff2a4a] hover:text-white lg:hidden">
+            <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu" data-testid="menu-button" className="rounded border border-[#ff8a1f]/30 p-2 text-[#ffd27a] hover:border-[#ff8a1f] hover:text-white lg:hidden">
               <Menu size={16} />
             </button>
             <ArcReactor size={34} mode={reactorMode} testId="header-reactor" />
@@ -245,20 +246,20 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
               <p className="font-heading text-xs tracking-[0.3em] text-white glow-text" data-testid="header-title">
                 PANDI AI
               </p>
-              <p className="font-heading text-[8px] tracking-[0.3em] text-[#ff2a4a]" data-testid="header-status">
+              <p className="font-heading text-[8px] tracking-[0.3em] text-[#ff8a1f]" data-testid="header-status">
                 {reactorMode === "thinking" ? "PROCESSING" : reactorMode === "speaking" ? "SPEAKING" : reactorMode === "listening" ? "LISTENING" : "ONLINE"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1 rounded border border-[#ff2a4a]/30 bg-black/40 p-0.5" role="tablist" data-testid="main-tabs">
-            <button type="button" role="tab" aria-selected={tab === "chat"} onClick={() => setTab("chat")} data-testid="tab-chat" className={`inline-flex items-center gap-1 rounded px-3 py-1.5 font-heading text-[10px] tracking-[0.2em] ${tab === "chat" ? "bg-[#ff2a4a]/25 text-white shadow-[0_0_12px_rgba(255,42,74,0.35)]" : "text-[#d9a6ae] hover:text-white"}`}>
+          <div className="flex items-center gap-1 rounded border border-[#ff8a1f]/30 bg-black/40 p-0.5" role="tablist" data-testid="main-tabs">
+            <button type="button" role="tab" aria-selected={tab === "chat"} onClick={() => setTab("chat")} data-testid="tab-chat" className={`inline-flex items-center gap-1 rounded px-3 py-1.5 font-heading text-[10px] tracking-[0.2em] ${tab === "chat" ? "bg-[#ff8a1f]/25 text-white shadow-[0_0_12px_rgba(255, 138, 31,0.35)]" : "text-[#d9a66a] hover:text-white"}`}>
               <MessageSquareText size={12} /> CHAT
             </button>
-            <button type="button" role="tab" aria-selected={tab === "lab"} onClick={() => setTab("lab")} data-testid="tab-lab" className={`inline-flex items-center gap-1 rounded px-3 py-1.5 font-heading text-[10px] tracking-[0.2em] ${tab === "lab" ? "bg-[#ff2a4a]/25 text-white shadow-[0_0_12px_rgba(255,42,74,0.35)]" : "text-[#d9a6ae] hover:text-white"}`}>
+            <button type="button" role="tab" aria-selected={tab === "lab"} onClick={() => setTab("lab")} data-testid="tab-lab" className={`inline-flex items-center gap-1 rounded px-3 py-1.5 font-heading text-[10px] tracking-[0.2em] ${tab === "lab" ? "bg-[#ff8a1f]/25 text-white shadow-[0_0_12px_rgba(255, 138, 31,0.35)]" : "text-[#d9a66a] hover:text-white"}`}>
               <Boxes size={12} /> HOLOGRAM LAB
             </button>
           </div>
-          <button type="button" onClick={newChat} data-testid="header-new-chat" className="inline-flex items-center gap-1 rounded border border-[#ff2a4a]/60 bg-[#ff2a4a]/10 px-3 py-1.5 font-heading text-[10px] tracking-[0.25em] text-white hover:bg-[#ff2a4a]/25">
+          <button type="button" onClick={newChat} data-testid="header-new-chat" className="inline-flex items-center gap-1 rounded border border-[#ff8a1f]/60 bg-[#ff8a1f]/10 px-3 py-1.5 font-heading text-[10px] tracking-[0.25em] text-white hover:bg-[#ff8a1f]/25">
             <Plus size={12} /> <span className="hidden sm:inline">NEW</span>
           </button>
         </header>
@@ -273,11 +274,11 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
               {history.isLoading && (
                 <div className="flex flex-col items-center gap-3 py-16" data-testid="history-loading">
                   <ArcReactor size={64} mode="thinking" testId="history-loading-reactor" />
-                  <p className="font-heading text-[10px] tracking-[0.3em] text-[#ffb0bc] animate-pulse">SYNCHRONIZING MEMORY…</p>
+                  <p className="font-heading text-[10px] tracking-[0.3em] text-[#ffd27a] animate-pulse">SYNCHRONIZING MEMORY…</p>
                 </div>
               )}
               {history.isError && (
-                <p className="rounded border border-[#ff7a00]/40 bg-[#ff7a00]/10 px-3 py-2 text-xs text-[#ffb070]" data-testid="history-error">
+                <p className="rounded border border-[#ff3b3b]/40 bg-[#ff3b3b]/10 px-3 py-2 text-xs text-[#ff9d9d]" data-testid="history-error">
                   Chat history could not be loaded — you can still send new messages.
                 </p>
               )}
@@ -287,14 +288,14 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
                   <div className="mb-6 flex flex-col items-center text-center">
                     <ArcReactor size={120} mode={reactorMode} className="mb-7" testId="hero-reactor" beam />
                     <h2 className="font-heading text-lg tracking-[0.22em] text-white glow-text">PANDI AI MARK II</h2>
-                    <p className="mt-1 font-heading text-[9px] tracking-[0.4em] text-[#ff2a4a]">THE HOLOGRAM INTELLIGENCE</p>
+                    <p className="mt-1 font-heading text-[9px] tracking-[0.4em] text-[#ff8a1f]">THE HOLOGRAM INTELLIGENCE</p>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2" data-testid="suggestion-cards">
                     {SUGGESTIONS.map((s) => (
-                      <button key={s.label} type="button" onClick={() => void send(s.label, [])} data-testid="suggestion-card" className="hud-panel hud-corners group rounded-md px-4 py-3 text-left hover:bg-[#ff2a4a]/10 hover:shadow-[0_0_20px_rgba(255,42,74,0.25)]">
+                      <button key={s.label} type="button" onClick={() => void send(s.label, [])} data-testid="suggestion-card" className="hud-panel hud-corners group rounded-md px-4 py-3 text-left hover:bg-[#ff8a1f]/10 hover:shadow-[0_0_20px_rgba(255, 138, 31,0.25)]">
                         <span className="hud-c" />
-                        <p className="font-heading text-[9px] tracking-[0.3em] text-[#ff2a4a]">{s.hint}</p>
-                        <p className="mt-1 text-sm text-[#fff0f2] group-hover:text-white">{s.label}</p>
+                        <p className="font-heading text-[9px] tracking-[0.3em] text-[#ff8a1f]">{s.hint}</p>
+                        <p className="mt-1 text-sm text-[#fff5e8] group-hover:text-white">{s.label}</p>
                       </button>
                     ))}
                   </div>
@@ -307,7 +308,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
           </div>
         )}
 
-        <div className="border-t border-[#ff2a4a]/15 bg-[#050204]/70 px-3 py-3 backdrop-blur sm:px-6">
+        <div className="border-t border-[#ff8a1f]/15 bg-[#000000]/70 px-3 py-3 backdrop-blur sm:px-6">
           <div className="mx-auto flex max-w-3xl items-end gap-2">
             <div className="min-w-0 flex-1">
               <InputBar disabled={Boolean(draft)} onSend={(t, f) => void send(t, f)} onListeningChange={setListening} />
@@ -319,12 +320,12 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
               aria-label="Voice conversation mode"
               data-testid="voice-mode-button"
               data-active={voiceMode}
-              className={`mb-[2px] inline-flex h-[52px] w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded border font-heading text-[7px] tracking-widest ${voiceMode ? "border-[#ff2a4a] bg-[#ff2a4a]/30 text-white animate-reactor-pulse" : "border-[#ff2a4a]/40 bg-black/40 text-[#ffb0bc] hover:border-[#ff2a4a] hover:text-white"}`}
+              className={`mb-[2px] inline-flex h-[52px] w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded border font-heading text-[7px] tracking-widest ${voiceMode ? "border-[#ff8a1f] bg-[#ff8a1f]/30 text-white animate-reactor-pulse" : "border-[#ff8a1f]/40 bg-black/40 text-[#ffd27a] hover:border-[#ff8a1f] hover:text-white"}`}
             >
               <AudioLines size={16} /> TALK
             </button>
           </div>
-          <p className="mt-1.5 text-center text-[9px] tracking-[0.25em] text-[#7d4f58]">PANDI AI MARK II · CREATED BY VIGNASHWAR S. · {voice.provider === "elevenlabs" ? "OFFICIAL VOICE" : voice.provider === "browser" ? "FALLBACK VOICE" : "VOICE READY"}</p>
+          <p className="mt-1.5 text-center text-[9px] tracking-[0.25em] text-[#7a4a22]">PANDI AI MARK II · CREATED BY VIGNEASHWAR · {voice.provider === "elevenlabs" ? "OFFICIAL VOICE" : voice.provider === "browser" ? "FALLBACK VOICE" : "VOICE READY"}</p>
         </div>
       </main>
 
@@ -336,14 +337,14 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
           </p>
           <div className="mt-4 flex h-10 items-end gap-1" aria-hidden>
             {Array.from({ length: 16 }, (_v, i) => (
-              <span key={i} className={`w-1.5 rounded-sm bg-[#ff2a4a] ${voice.status === "speaking" || handsFree.listening ? "animate-wave" : ""}`} style={{ height: voice.status === "speaking" || handsFree.listening ? "100%" : "15%", animationDelay: `${i * 0.06}s`, opacity: 0.5 + (i % 3) * 0.2 }} />
+              <span key={i} className={`w-1.5 rounded-sm bg-[#ff8a1f] ${voice.status === "speaking" || handsFree.listening ? "animate-wave" : ""}`} style={{ height: voice.status === "speaking" || handsFree.listening ? "100%" : "15%", animationDelay: `${i * 0.06}s`, opacity: 0.5 + (i % 3) * 0.2 }} />
             ))}
           </div>
-          <p className="mt-4 max-w-md px-6 text-center text-sm text-[#ffd9de]">{handsFree.interim || (draft?.content ? draft.content.slice(0, 160) : "Speak naturally — PANDI replies out loud and listens again.")}</p>
-          <button type="button" onClick={exitVoiceMode} data-testid="voice-mode-exit" className="mt-8 inline-flex items-center gap-2 rounded border border-[#ff2a4a]/60 bg-black/60 px-5 py-2 font-heading text-[11px] tracking-[0.25em] text-white hover:bg-[#ff2a4a]/25">
+          <p className="mt-4 max-w-md px-6 text-center text-sm text-[#ffe3b8]">{handsFree.interim || (draft?.content ? draft.content.slice(0, 160) : "Speak naturally — PANDI replies out loud and listens again.")}</p>
+          <button type="button" onClick={exitVoiceMode} data-testid="voice-mode-exit" className="mt-8 inline-flex items-center gap-2 rounded border border-[#ff8a1f]/60 bg-black/60 px-5 py-2 font-heading text-[11px] tracking-[0.25em] text-white hover:bg-[#ff8a1f]/25">
             <X size={14} /> EXIT VOICE MODE
           </button>
-          <p className="mt-3 inline-flex items-center gap-1 text-[10px] tracking-[0.25em] text-[#7d4f58]">
+          <p className="mt-3 inline-flex items-center gap-1 text-[10px] tracking-[0.25em] text-[#7a4a22]">
             <Mic size={10} /> HANDS-FREE CONVERSATION
           </p>
         </div>

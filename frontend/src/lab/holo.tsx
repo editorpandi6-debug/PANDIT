@@ -6,10 +6,10 @@ import type { ReactNode } from "react";
 import { CanvasTexture, LinearFilter, SRGBColorSpace } from "three";
 import type { Group } from "three";
 
-export const HOLO = "#ff2a4a";
-export const HOLO_DIM = "#8a1020";
+export const HOLO = "#ff8a1f";
+export const HOLO_DIM = "#c2300a";
 export const WARM = "#ffb347";
-export const HOT = "#ff7a00";
+export const HOT = "#ff3b3b";
 export const GREEN = "#52ffa8";
 export const VIOLET = "#9d7cff";
 
@@ -24,14 +24,21 @@ export interface LabState {
   activeStep: number;
   /** extra scene flag (geometry: unfold net) */
   toggle: boolean;
+  renderMode: RenderMode;
+  /** 0..1 exploded-view factor (custom part models) */
+  explode: number;
   select: (info: SelectInfo | null) => void;
 }
+
+export type RenderMode = "solid" | "wire" | "xray";
 
 export const LabContext = createContext<LabState>({
   playing: true,
   speed: 1,
   activeStep: -1,
   toggle: false,
+  renderMode: "solid",
+  explode: 0,
   select: () => {},
 });
 
@@ -61,6 +68,9 @@ interface HoloProps {
 
 /** Glowing translucent solid with red wire edges. Children = a geometry element. */
 export function Holo({ color = HOLO, opacity = 0.28, emissive = 0.9, edges = true, active = false, children, position, rotation, onClick }: HoloProps) {
+  const { renderMode } = useLab();
+  const wire = renderMode === "wire";
+  const xray = renderMode === "xray";
   return (
     <mesh
       position={position}
@@ -82,12 +92,13 @@ export function Holo({ color = HOLO, opacity = 0.28, emissive = 0.9, edges = tru
         emissive={color}
         emissiveIntensity={active ? emissive * 1.8 : emissive}
         transparent
-        opacity={active ? Math.min(1, opacity + 0.3) : opacity}
+        opacity={wire ? 0.08 : xray ? Math.min(0.22, opacity * 0.5) : active ? Math.min(1, opacity + 0.3) : opacity}
         roughness={0.3}
         metalness={0.1}
         depthWrite={false}
+        wireframe={wire}
       />
-      {edges && <Edges threshold={15} color={active ? "#ffffff" : color} />}
+      {(edges || xray) && <Edges threshold={15} color={active ? "#ffffff" : color} />}
     </mesh>
   );
 }
@@ -127,14 +138,14 @@ export function Label({ position, children, active = false, small = false, onCli
     canvas.width = Math.max(8, w);
     canvas.height = Math.ceil(h);
     ctx.font = font;
-    ctx.fillStyle = active ? "rgba(255,42,74,0.35)" : "rgba(15,2,5,0.82)";
-    ctx.strokeStyle = active ? "#ffffff" : "rgba(255,42,74,0.75)";
+    ctx.fillStyle = active ? "rgba(255, 138, 31,0.35)" : "rgba(15,2,5,0.82)";
+    ctx.strokeStyle = active ? "#ffffff" : "rgba(255, 138, 31,0.75)";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(1, 1, canvas.width - 2, canvas.height - 2, 6);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = active ? "#ffffff" : "#ffd9de";
+    ctx.fillStyle = active ? "#ffffff" : "#ffe3b8";
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
     ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 1);
@@ -167,7 +178,7 @@ export function Label({ position, children, active = false, small = false, onCli
 }
 
 export function Floor({ y = -2.5, size = 30 }: { y?: number; size?: number }) {
-  return <gridHelper args={[size, size, HOLO_DIM, "#3a0a12"]} position={[0, y, 0]} />;
+  return <gridHelper args={[size, size, HOLO_DIM, "#3a1a06"]} position={[0, y, 0]} />;
 }
 
 export function Lights() {

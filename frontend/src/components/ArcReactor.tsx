@@ -13,98 +13,133 @@ interface Props {
   beam?: boolean;
 }
 
-const RED = "#ff2a4a";
-const CRIMSON = "#b3001b";
+interface Spark {
+  a: number; // angle
+  r: number; // radius factor (1 = on the ring)
+  v: number; // angular speed
+  drift: number; // radial drift speed
+  s: number; // size
+  life: number;
+  hue: number; // 0 white-yellow .. 1 ember
+}
 
 /**
- * Live holographic arc reactor drawn in SVG/CSS: concentric wireframe rings rotating in opposite directions,
- * segmented plates, a triangular core that pulses (in sync with the voice level while speaking), orbiting energy
- * particles, red glow/bloom, scanline flicker and a projected light beam underneath. No raster image is used.
+ * PANDI core: a large glowing fire ring (white-hot yellow → orange → ember red) with a dark hollow centre and
+ * hundreds of spark particles streaming in a spiral around it. Soft pulse when idle; sparks speed up and brighten
+ * while thinking or speaking (voice level drives the pulse).
  */
 export function ArcReactor({ size = 64, mode = "idle", className, testId = "arc-reactor", beam = false }: Props) {
-  const coreRef = useRef<SVGGElement>(null);
-  const glowRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
-  // Voice-synced pulse: scale the core with the live audio level while speaking, gentle breathing otherwise.
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const px = Math.round(size * 1.5); // overflow room for sparks/glow
+    canvas.width = px * dpr;
+    canvas.height = px * dpr;
+    ctx.scale(dpr, dpr);
+    const count = Math.min(420, Math.max(90, Math.round(size * 2.2)));
+    const sparks: Spark[] = Array.from({ length: count }, () => ({
+      a: Math.random() * Math.PI * 2,
+      r: 0.75 + Math.random() * 0.7,
+      v: 0.4 + Math.random() * 0.9,
+      drift: (Math.random() - 0.5) * 0.25,
+      s: 0.4 + Math.random() * 1.1,
+      life: Math.random(),
+      hue: Math.random(),
+    }));
     let raf = 0;
+    let last = performance.now();
     let t = 0;
-    const tick = () => {
-      t += 0.016;
-      let level = 0;
-      if (mode === "speaking") level = getVoiceLevel();
-      else if (mode === "thinking") level = 0.35 + 0.35 * Math.sin(t * 5);
-      else if (mode === "listening") level = 0.25 + 0.25 * Math.sin(t * 2.5);
-      else level = 0.1 + 0.1 * Math.sin(t * 1.4);
-      const s = 1 + level * 0.28;
-      if (coreRef.current) coreRef.current.setAttribute("transform", `translate(100 100) scale(${s.toFixed(3)}) translate(-100 -100)`);
-      if (glowRef.current) glowRef.current.style.opacity = String(0.45 + level * 0.55);
+    const cx = px / 2;
+    const cy = px / 2;
+    const R = size * 0.36;
+
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      t += dt;
+      const m = modeRef.current;
+      const level = m === "speaking" ? getVoiceLevel() : m === "thinking" ? 0.45 + 0.35 * Math.sin(t * 6) : m === "listening" ? 0.3 + 0.2 * Math.sin(t * 3) : 0.08 + 0.08 * Math.sin(t * 1.6);
+      const energy = m === "idle" ? 1 : 1.8 + level * 1.4;
+
+      ctx.clearRect(0, 0, px, px);
+      ctx.globalCompositeOperation = "lighter";
+
+      // outer glow halo
+      const halo = ctx.createRadialGradient(cx, cy, R * 0.6, cx, cy, R * (1.9 + level * 0.4));
+      halo.addColorStop(0, `rgba(255, 138, 31, ${0.18 + level * 0.25})`);
+      halo.addColorStop(0.5, `rgba(194, 48, 10, ${0.1 + level * 0.1})`);
+      halo.addColorStop(1, "rgba(194, 48, 10, 0)");
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, px, px);
+
+      // the fire ring: ember outer, orange body, white-hot inner edge
+      const w = Math.max(2, size * 0.085) * (1 + level * 0.25);
+      const ringGrad = ctx.createRadialGradient(cx, cy, R - w, cx, cy, R + w);
+      ringGrad.addColorStop(0, "rgba(255, 210, 122, 0)");
+      ringGrad.addColorStop(0.35, "rgba(255, 210, 122, 0.95)");
+      ringGrad.addColorStop(0.55, "rgba(255, 138, 31, 0.95)");
+      ringGrad.addColorStop(0.8, "rgba(194, 48, 10, 0.7)");
+      ringGrad.addColorStop(1, "rgba(194, 48, 10, 0)");
+      ctx.fillStyle = ringGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + w, 0, Math.PI * 2);
+      ctx.arc(cx, cy, Math.max(0, R - w), 0, Math.PI * 2, true);
+      ctx.fill();
+
+      // bright rotating hot-spots on the ring
+      for (let i = 0; i < 3; i += 1) {
+        const a = t * (0.6 + i * 0.25) * energy + (i * Math.PI * 2) / 3;
+        const hx = cx + Math.cos(a) * R;
+        const hy = cy + Math.sin(a) * R;
+        const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, w * 2.2);
+        g.addColorStop(0, "rgba(255, 245, 220, 0.9)");
+        g.addColorStop(0.4, "rgba(255, 210, 122, 0.5)");
+        g.addColorStop(1, "rgba(255, 138, 31, 0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(hx, hy, w * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // sparks streaming in a spiral
+      for (const sp of sparks) {
+        sp.a += dt * sp.v * energy * (1.2 - sp.r * 0.3);
+        sp.r += dt * (sp.drift + Math.sin(t * 0.7 + sp.a) * 0.08) * energy * 0.6;
+        sp.life += dt * 0.35 * energy;
+        if (sp.r > 1.55 || sp.r < 0.55 || sp.life > 1) {
+          sp.r = 0.95 + (Math.random() - 0.5) * 0.15;
+          sp.a = Math.random() * Math.PI * 2;
+          sp.drift = (Math.random() - 0.3) * 0.3;
+          sp.life = 0;
+          sp.hue = Math.random();
+        }
+        const fade = Math.sin(Math.min(1, sp.life) * Math.PI);
+        const x = cx + Math.cos(sp.a) * R * sp.r;
+        const y = cy + Math.sin(sp.a) * R * sp.r;
+        const alpha = (0.35 + 0.65 * fade) * (0.6 + level * 0.4);
+        const rr = sp.s * (size / 90) * (1 + level * 0.5);
+        ctx.fillStyle = sp.hue < 0.3 ? `rgba(255, 235, 190, ${alpha})` : sp.hue < 0.75 ? `rgba(255, 138, 31, ${alpha})` : `rgba(194, 48, 10, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(0.4, rr), 0, Math.PI * 2);
+        ctx.fill();
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [mode]);
-
-  const speed = mode === "speaking" ? 0.45 : mode === "thinking" ? 0.6 : 1;
-  const segs = Array.from({ length: 12 }, (_v, i) => i * 30);
-  const plates = Array.from({ length: 8 }, (_v, i) => i * 45);
+  }, [size]);
 
   return (
-    <div className={cn("reactor relative shrink-0 select-none", className)} style={{ width: size, height: size }} data-testid={testId} data-mode={mode}>
+    <div className={cn("relative shrink-0 select-none", className)} style={{ width: size, height: size }} data-testid={testId} data-mode={mode}>
       {beam && <div className="reactor-beam" aria-hidden />}
-      <div ref={glowRef} className="absolute inset-[-25%] rounded-full" style={{ background: `radial-gradient(circle, rgba(255,42,74,0.55) 0%, rgba(255,42,74,0.18) 40%, transparent 70%)`, filter: "blur(6px)" }} />
-      <svg viewBox="0 0 200 200" className="relative z-10 h-full w-full overflow-visible reactor-flicker" style={{ filter: "drop-shadow(0 0 6px rgba(255,42,74,0.9)) drop-shadow(0 0 18px rgba(255,42,74,0.45))" }}>
-        <defs>
-          <radialGradient id="pandiCore" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="35%" stopColor="#ffd0d6" />
-            <stop offset="70%" stopColor={RED} />
-            <stop offset="100%" stopColor={CRIMSON} stopOpacity="0.2" />
-          </radialGradient>
-        </defs>
-        {/* outer ring — slow clockwise */}
-        <g className="reactor-spin" style={{ animationDuration: `${18 * speed}s` }}>
-          <circle cx="100" cy="100" r="94" fill="none" stroke={RED} strokeWidth="1.2" strokeOpacity="0.8" />
-          <circle cx="100" cy="100" r="88" fill="none" stroke={RED} strokeWidth="5" strokeOpacity="0.55" strokeDasharray="28 18" strokeLinecap="butt" />
-          {segs.map((a) => (
-            <line key={a} x1="100" y1="6" x2="100" y2="16" stroke={RED} strokeWidth="1.5" transform={`rotate(${a} 100 100)`} strokeOpacity="0.9" />
-          ))}
-        </g>
-        {/* segmented plate ring — counter-clockwise */}
-        <g className="reactor-spin-rev" style={{ animationDuration: `${11 * speed}s` }}>
-          <circle cx="100" cy="100" r="72" fill="none" stroke={RED} strokeWidth="1" strokeOpacity="0.7" />
-          {plates.map((a) => (
-            <path key={a} d="M 100 36 L 100 46 L 118 49 L 118 39 Z" fill={RED} fillOpacity="0.25" stroke={RED} strokeWidth="1" transform={`rotate(${a} 100 100)`} />
-          ))}
-          <circle cx="100" cy="100" r="62" fill="none" stroke="#ffffff" strokeWidth="0.6" strokeOpacity="0.5" strokeDasharray="4 8" />
-        </g>
-        {/* inner ring — clockwise, faster */}
-        <g className="reactor-spin" style={{ animationDuration: `${7 * speed}s` }}>
-          <circle cx="100" cy="100" r="52" fill="none" stroke={RED} strokeWidth="2.5" strokeOpacity="0.8" strokeDasharray="60 22" />
-          {[0, 120, 240].map((a) => (
-            <circle key={a} cx="100" cy="48" r="3" fill={RED} transform={`rotate(${a} 100 100)`} />
-          ))}
-        </g>
-        {/* triangular core */}
-        <g ref={coreRef}>
-          <polygon points="100,62 136,122 64,122" fill="none" stroke={RED} strokeWidth="2.2" strokeLinejoin="round" />
-          <polygon points="100,74 126,116 74,116" fill="url(#pandiCore)" fillOpacity="0.95" stroke="#ffffff" strokeWidth="1" strokeOpacity="0.9" strokeLinejoin="round" />
-          <polygon points="100,86 114,110 86,110" fill="#ffffff" fillOpacity="0.9" />
-          <circle cx="100" cy="100" r="34" fill="none" stroke={RED} strokeWidth="0.8" strokeOpacity="0.6" />
-        </g>
-        {/* orbiting energy particles */}
-        <g className="reactor-spin" style={{ animationDuration: `${4.5 * speed}s` }}>
-          <circle cx="100" cy="20" r="2.4" fill="#ffffff" />
-          <circle cx="100" cy="20" r="5" fill={RED} fillOpacity="0.35" />
-        </g>
-        <g className="reactor-spin-rev" style={{ animationDuration: `${6.5 * speed}s` }}>
-          <circle cx="100" cy="170" r="2" fill="#ffd0d6" />
-          <circle cx="100" cy="170" r="4.5" fill={RED} fillOpacity="0.35" />
-        </g>
-        <g className="reactor-spin" style={{ animationDuration: `${9 * speed}s`, transformOrigin: "100px 100px" }}>
-          <circle cx="178" cy="100" r="1.8" fill="#ffffff" fillOpacity="0.9" />
-        </g>
-      </svg>
+      <canvas ref={canvasRef} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: size * 1.5, height: size * 1.5 }} aria-hidden />
     </div>
   );
 }

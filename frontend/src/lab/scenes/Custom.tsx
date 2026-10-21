@@ -57,14 +57,15 @@ function Item({ obj, index }: { obj: CustomObject; index: number }) {
     const g = ref.current;
     if (!g) return;
     const t = clock.current * speed;
-    g.position.set(base[0], base[1], base[2]);
+    const ex = 1 + lab.explode * 1.4;
+    g.position.set(base[0] * ex, base[1] * ex, base[2] * ex);
     g.rotation.set(0, 0, 0);
     g.scale.setScalar(1);
     if (anim === "rotate") g.rotation.y = t;
-    else if (anim === "orbit") g.position.set(Math.cos(t * 0.6 + phase) * orbitR, base[1], Math.sin(t * 0.6 + phase) * orbitR);
+    else if (anim === "orbit") g.position.set(Math.cos(t * 0.6 + phase) * orbitR * ex, base[1] * ex, Math.sin(t * 0.6 + phase) * orbitR * ex);
     else if (anim === "pulse") g.scale.setScalar(1 + 0.12 * Math.sin(t * 3 + phase));
-    else if (anim === "bounce") g.position.y = base[1] + Math.abs(Math.sin(t * 2 + phase)) * 0.8;
-    else if (anim === "float") g.position.y = base[1] + Math.sin(t * 1.2 + phase) * 0.25;
+    else if (anim === "bounce") g.position.y = base[1] * ex + Math.abs(Math.sin(t * 2 + phase)) * 0.8;
+    else if (anim === "float") g.position.y = base[1] * ex + Math.sin(t * 1.2 + phase) * 0.25;
   });
   const color = obj.color && /^#?[0-9a-f]{3,8}$/i.test(obj.color) ? (obj.color.startsWith("#") ? obj.color : `#${obj.color}`) : HOLO;
   const active = lab.activeStep === index;
@@ -94,7 +95,7 @@ function Item({ obj, index }: { obj: CustomObject; index: number }) {
           opacity={num(obj.opacity, 0.35)}
           active={active}
           edges={shape !== "sphere" && shape !== "capsule" && shape !== "torus"}
-          onClick={obj.label ? () => lab.select({ title: obj.label!.toUpperCase(), lines: [`Shape: ${shape}`, obj.animation && obj.animation !== "none" ? `Animation: ${obj.animation}` : "Static element"] }) : undefined}
+          onClick={obj.label ? () => lab.select({ title: obj.label!.toUpperCase(), lines: obj.info ? [obj.info] : [`Shape: ${shape}`, obj.animation && obj.animation !== "none" ? `Animation: ${obj.animation}` : "Static element"] }) : undefined}
         >
           <Geometry shape={shape} size={size} />
         </Holo>

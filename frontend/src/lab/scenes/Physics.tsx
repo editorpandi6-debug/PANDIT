@@ -32,7 +32,7 @@ export function Projectile({ params }: { params: Record<string, unknown> }) {
   return (
     <group position={[0, -2, 0]}>
       <Line points={path} color={HOLO} lineWidth={2} dashed dashSize={0.2} gapSize={0.1} />
-      <Line points={[[-rangeM * scale * 0.5 - 1, 0, 0], [rangeM * scale * 0.5 + 1, 0, 0]]} color="#ffb0bc" />
+      <Line points={[[-rangeM * scale * 0.5 - 1, 0, 0], [rangeM * scale * 0.5 + 1, 0, 0]]} color="#ffd27a" />
       <Line points={[[-rangeM * scale * 0.5, 0, 0], [-rangeM * scale * 0.5 + Math.cos(angle) * 1.6, Math.sin(angle) * 1.6, 0]]} color={WARM} lineWidth={3} />
       <Label position={[-rangeM * scale * 0.5 + 1.2, 0.5, 0]} small active={lab.activeStep === 0}>
         v₀ = {v} m/s · θ = {Math.round((angle * 180) / Math.PI)}°
@@ -124,7 +124,7 @@ export function Wave({ params }: { params: Record<string, unknown> }) {
   return (
     <group>
       <Line ref={lineRef as never} points={base.map((x) => [x, 0, 0] as [number, number, number])} color={HOLO} lineWidth={3} />
-      <Line points={[[-8.5, 0, 0], [8.5, 0, 0]]} color="#ffb0bc" transparent opacity={0.5} />
+      <Line points={[[-8.5, 0, 0], [8.5, 0, 0]]} color="#ffd27a" transparent opacity={0.5} />
       <group ref={particles}>
         {Array.from({ length: 8 }, (_v, i) => (
           <mesh key={i}>
@@ -237,7 +237,7 @@ export function Optics({ params }: { params: Record<string, unknown> }) {
         </Holo>
       )}
       {/* normal */}
-      <Line points={[[0, 4.5, 0], [0, -4.5, 0]]} color="#ffb0bc" dashed dashSize={0.2} gapSize={0.15} transparent opacity={0.6} />
+      <Line points={[[0, 4.5, 0], [0, -4.5, 0]]} color="#ffd27a" dashed dashSize={0.2} gapSize={0.15} transparent opacity={0.6} />
       <Label position={[0.6, 4.3, 0]} small>
         normal
       </Label>

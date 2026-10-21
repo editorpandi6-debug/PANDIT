@@ -3,20 +3,23 @@
 import logging
 import os
 import re
+import uuid
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from lib.db import db
-from models.pandi import TTSRequest, VoiceStatus
+from models.pandi import TranscribeResponse, TTSRequest, VoiceStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/voice", tags=["voice"])
 
 ENV_PATH = Path(__file__).parent.parent / ".env"
 SAMPLE_PATH = Path(__file__).parent.parent.parent / "frontend" / "public" / "assets" / "my-voice.mp3"
+UPLOAD_DIR = Path("/tmp/pandi_uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 SETTINGS_KEY = "voice"
 
 
@@ -131,3 +134,33 @@ async def text_to_speech(request: TTSRequest) -> StreamingResponse:
     except Exception as exc:
         logger.exception("TTS failed")
         raise HTTPException(status_code=502, detail=f"Voice generation failed: {exc}") from exc
+
+
+@router.post("/transcribe", response_model=TranscribeResponse)
+async def transcribe_audio(file: UploadFile = File(...)) -> TranscribeResponse:
+    """Fallback speech-to-text (Whisper via the Emergent universal key) for browsers without SpeechRecognition."""
+    api_key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Voice transcription is not configured. Please type your message instead.")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="No audio was recorded.")
+
+    suffix = Path(file.filename or "audio.webm").suffix or ".webm"
+    tmp_path = UPLOAD_DIR / f"{uuid.uuid4()}{suffix}"
+    tmp_path.write_bytes(content)
+    try:
+        from emergentintegrations.llm.openai.speech_to_text import OpenAISpeechToText
+
+        stt = OpenAISpeechToText(api_key=api_key)
+        result = await stt.transcribe(str(tmp_path), model="whisper-1")
+        text = getattr(result, "text", None)
+        if text is None and isinstance(result, dict):
+            text = result.get("text")
+        return TranscribeResponse(text=(text or "").strip())
+    except Exception as exc:
+        logger.exception("Transcription failed")
+        raise HTTPException(status_code=502, detail="PANDI could not transcribe that audio. Please try again or type instead.") from exc
+    finally:
+        tmp_path.unlink(missing_ok=True)
