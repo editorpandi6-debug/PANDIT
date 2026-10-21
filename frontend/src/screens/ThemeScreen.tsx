@@ -4,8 +4,8 @@ import { KEYS, storage } from "@/lib/storage";
 import { VAJRA_FILTER, type InterfaceTheme } from "@/lib/theme";
 
 const CARDS: { id: InterfaceTheme; title: string; tagline: string; filter?: string; accent: string }[] = [
-  { id: "agni", title: "AGNI PORTAL", tagline: "Fire-forged ring, embers and sparks on pure black.", accent: "#ff8a1f" },
-  { id: "vajra", title: "VAJRA CORE", tagline: "Jarvis-style holographic HUD in electric blue and cyan.", filter: VAJRA_FILTER, accent: "#00d4ff" },
+  { id: "agni", title: "IGNIS RIFT", tagline: "Fire-forged ring, embers and sparks on pure black.", accent: "#ff8a1f" },
+  { id: "vajra", title: "NOVA STRIKE", tagline: "Jarvis-style holographic HUD in electric blue and cyan.", filter: VAJRA_FILTER, accent: "#00d4ff" },
 ];
 
 /** "Choose your interface" — two live-preview cards; the choice can be changed later in Settings. */

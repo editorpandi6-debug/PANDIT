@@ -360,8 +360,8 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
               data-testid="settings-theme-select"
               className="mt-1 h-9 w-full rounded border border-[#ff8a1f]/30 bg-[#050302] px-2 text-sm text-white focus:border-[#ff8a1f] focus:outline-none"
             >
-              <option value="agni">AGNI Portal (fire)</option>
-              <option value="vajra">VAJRA Core (electric blue / cyan)</option>
+              <option value="agni">IGNIS RIFT (fire)</option>
+              <option value="vajra">NOVA STRIKE (electric blue / cyan)</option>
             </select>
             <span className="mt-1 block text-[10px] text-[#a8713a]">Changing this reloads PANDI to apply the new look.</span>
           </label>
