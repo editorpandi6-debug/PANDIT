@@ -27,7 +27,13 @@ AGNI Portal is the base CSS (fire colors). VAJRA Core is produced by applying `h
 - New `IntroVideoResponse { video_url }`, `TranscribeResponse { text }`.
 - `pandi_settings` collection, doc `{key: "app", intro_video_url}` — will be written by the Phase 3 Owner Console.
 
-## Known deferred items (by user instruction — budget-gated phases)
+## 3D Creation Engine (Phase 2, partial — "CREATE 3D" tab)
+- `POST /api/creation/generate {profile_id, prompt}` → one GPT-5.1 call produces a structured design brief (category, proportions, parts, materials, honest limitations) as 8-20 labelled primitive shapes, reusing the existing `SceneSpec(scene="custom")` renderer (same `VirtualLab` viewer as the Hologram Lab — rotate/zoom/wireframe/exploded view all work unchanged). Falls back to Gemini 3 Flash if GPT-5.1 fails, then to a single labelled placeholder box if both fail — never crashes.
+- One `gpt-image-1` call (via `OpenAIImageGeneration`) produces a concept reference image (base64 data URL, stored inline) alongside the 3D model.
+- No Tripo/paid 3D-generation key is configured: every result carries an explicit on-screen limitation note that this is a procedural primitive-shape model, not a photorealistic scan, and that true photorealism needs an external paid service.
+- `GET /api/creation/gallery/{profile_id}` + `GET /api/creation/{id}` persist/reopen past creations (`pandi_creations` collection) — shown as a thumbnail gallery under the viewer.
+- GLB export and Tripo-based photoreal generation are NOT implemented (would need a Tripo API key) — deferred, consistent with the user's "no external keys/charges" instruction.
+
 - Phase 2 (3D creation via Tripo/parametric fallback) and Phase 3 (Owner Console, admin code `123P456P`) are NOT started — waiting for user's "continue".
 - ElevenLabs voice cloning stays on browser-TTS fallback until `ELEVENLABS_API_KEY` is provided.
 - Tripo API key not yet provided — Phase 2 will use the parametric Three.js fallback first per user's explicit instruction.

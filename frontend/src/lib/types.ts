@@ -126,3 +126,30 @@ export interface TranscribeResponse {
 export interface IntroVideoResponse {
   video_url: string;
 }
+
+export interface CreationRequest {
+  profile_id: string;
+  prompt: string;
+}
+
+export interface Creation {
+  id: string;
+  profile_id: string;
+  prompt: string;
+  category: string;
+  name: string;
+  brief: string;
+  limitations: string;
+  scene: SceneSpec;
+  image_data_url: string | null;
+  created_at: string;
+}
+
+export interface CreationSummary {
+  id: string;
+  prompt: string;
+  category: string;
+  name: string;
+  image_data_url: string | null;
+  created_at: string;
+}

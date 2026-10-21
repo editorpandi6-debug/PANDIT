@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AudioLines, Boxes, Menu, MessageSquareText, Mic, Plus, X } from "lucide-react";
+import { AudioLines, Boxes, Menu, MessageSquareText, Mic, Plus, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { ArcReactor } from "@/components/ArcReactor";
 import { HoloBackground } from "@/components/HoloBackground";
@@ -10,6 +10,7 @@ import { useSpeechRecognition } from "@/lib/speech";
 import { KEYS, newId, storage } from "@/lib/storage";
 import { speak, stopSpeaking, useVoice } from "@/lib/voice";
 import type { ChatHistory, ChatMessage, ChatStreamRequest, FileUploadResponse, Profile, SceneSpec } from "@/lib/types";
+import { CreateTab } from "./CreateTab";
 import { HologramLabTab } from "./HologramLabTab";
 import { InputBar } from "./InputBar";
 import { MessageBubble } from "./MessageBubble";
@@ -22,7 +23,7 @@ const SUGGESTIONS = [
   { label: "Solve 3x² - 12 = 0 step by step", hint: "ALGEBRA" },
 ];
 
-type Tab = "chat" | "lab";
+type Tab = "chat" | "lab" | "create";
 
 interface Props {
   profile: Profile;
@@ -258,6 +259,9 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
             <button type="button" role="tab" aria-selected={tab === "lab"} onClick={() => setTab("lab")} data-testid="tab-lab" className={`inline-flex items-center gap-1 rounded px-3 py-1.5 font-heading text-[10px] tracking-[0.2em] ${tab === "lab" ? "bg-[#ff8a1f]/25 text-white shadow-[0_0_12px_rgba(255, 138, 31,0.35)]" : "text-[#d9a66a] hover:text-white"}`}>
               <Boxes size={12} /> HOLOGRAM LAB
             </button>
+            <button type="button" role="tab" aria-selected={tab === "create"} onClick={() => setTab("create")} data-testid="tab-create" className={`inline-flex items-center gap-1 rounded px-3 py-1.5 font-heading text-[10px] tracking-[0.2em] ${tab === "create" ? "bg-[#ff8a1f]/25 text-white shadow-[0_0_12px_rgba(255, 138, 31,0.35)]" : "text-[#d9a66a] hover:text-white"}`}>
+              <Sparkles size={12} /> CREATE 3D
+            </button>
           </div>
           <button type="button" onClick={newChat} data-testid="header-new-chat" className="inline-flex items-center gap-1 rounded border border-[#ff8a1f]/60 bg-[#ff8a1f]/10 px-3 py-1.5 font-heading text-[10px] tracking-[0.25em] text-white hover:bg-[#ff8a1f]/25">
             <Plus size={12} /> <span className="hidden sm:inline">NEW</span>
@@ -267,6 +271,10 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
         {tab === "lab" ? (
           <div className="flex-1 overflow-y-auto">
             <HologramLabTab scene={latestScene?.scene ?? null} messageId={latestScene?.id ?? null} lastQuestion={lastQuestion} busy={Boolean(draft)} onAsk={(t) => void send(t, [])} />
+          </div>
+        ) : tab === "create" ? (
+          <div className="flex-1 overflow-y-auto">
+            <CreateTab profileId={profile.profile_id} />
           </div>
         ) : (
           <div ref={scrollRef} className="screen-enter flex-1 overflow-y-auto px-3 py-4 sm:px-6" data-testid="message-list">

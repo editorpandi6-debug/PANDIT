@@ -128,3 +128,35 @@ class TranscribeResponse(BaseModel):
 
 class IntroVideoResponse(BaseModel):
     video_url: str
+
+
+class CreationRequest(BaseModel):
+    profile_id: str = Field(min_length=1, max_length=120)
+    prompt: str = Field(min_length=2, max_length=500)
+
+
+class Creation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    profile_id: str
+    prompt: str
+    category: str = "object"
+    name: str = ""
+    brief: str = ""
+    limitations: str = ""
+    scene: SceneSpec
+    image_data_url: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def _tz(cls, value: datetime) -> datetime:
+        return _aware(value)
+
+
+class CreationSummary(BaseModel):
+    id: str
+    prompt: str
+    category: str
+    name: str
+    image_data_url: str | None = None
+    created_at: datetime
