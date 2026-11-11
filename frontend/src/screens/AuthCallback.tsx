@@ -4,6 +4,7 @@ import { PortalLogo } from "@/components/PortalLogo";
 import { apiPost } from "@/lib/api";
 import { adoptUser } from "@/lib/identity";
 import { queryClient } from "@/lib/queryClient";
+import { KEYS, storage } from "@/lib/storage";
 import type { AuthUser, GoogleSessionRequest } from "@/lib/types";
 
 /** Returning from Google sign-in: exchange the one-time session_id (URL fragment) for a session cookie. */
@@ -21,6 +22,7 @@ export function AuthCallback() {
       .then((user) => {
         queryClient.clear();
         adoptUser(user);
+        storage.session.set(KEYS.introPending, "1");
         navigate("/", { replace: true });
       })
       .catch(() => setFailed(true));

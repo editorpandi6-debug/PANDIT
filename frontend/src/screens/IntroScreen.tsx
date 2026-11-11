@@ -159,7 +159,7 @@ export function IntroScreen({ onDone }: { onDone: () => void }) {
           <Play size={18} /> Play intro
         </button>
       )}
-      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+      <div className="absolute right-4 top-12 z-10 flex items-center gap-2">
         {showVideo && (
           <button
             type="button"

@@ -39,7 +39,14 @@ export default function Home() {
   const [mode, setMode] = useState<AuthMode | null>(authMode);
   const [profile, setProfile] = useState<Profile | null>(localProfile);
   const onboarded = Boolean(storage.get(KEYS.onboardingDone));
-  const [stage, setStage] = useState<Stage>(() => (localProfile() ? (onboarded ? "chat" : "voicetext") : "auth"));
+  const [stage, setStage] = useState<Stage>(() => {
+    if (!localProfile()) return "auth";
+    if (storage.session.get(KEYS.introPending)) {
+      storage.session.remove(KEYS.introPending); // just returned from Google sign-in
+      return "intro";
+    }
+    return onboarded ? "chat" : "voicetext";
+  });
   const [theme, setTheme] = useState<InterfaceTheme>(() => (storage.get(KEYS.interfaceTheme) as InterfaceTheme | null) ?? "agni");
   const hydratedFor = useRef<string | null>(null);
 
@@ -117,7 +124,8 @@ export default function Home() {
     toast("Profile reset. Welcome, new operator.");
   };
 
-  const afterEntry = () => setStage(storage.session.get(KEYS.introSeen) ? (onboarded ? "chat" : "voicetext") : "intro");
+  // The intro video plays after every sign-in (email, Google or guest); the user can skip it.
+  const afterEntry = () => setStage("intro");
 
   const boot = (label: string) => (
     <div className="relative flex min-h-screen flex-col items-center justify-center gap-4" data-testid="boot-screen">
@@ -159,7 +167,7 @@ export default function Home() {
               if (restoreGuest()) {
                 setMode("guest");
                 setProfile(localProfile());
-                setStage(onboarded ? "chat" : "voicetext");
+                afterEntry();
               } else {
                 setStage("name");
               }

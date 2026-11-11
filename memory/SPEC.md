@@ -11,6 +11,7 @@
 - Live search: chat "Search" toggle (`force_search`) + auto-search for current-info questions. Uses Tavily when TAVILY_API_KEY is set (`lib/search.py`), otherwise built-in Google-grounded Gemini. Sources shown under answers.
 - Images: chat detects "draw…/create a picture…" or the "Create image, N left today" button (`force_image`). `lib/images.py`: owner key gpt-image-1 → Emergent key gpt-image-2; stored in `pandi_images`, served at `/api/pandi/images/{id}` (+`?download=1`).
 - Voice: speed 0.5–2x, silence delay, start word ("Hey Pandi"), wake toggle, larger text in Settings (`lib/settings.ts`, saved to account via `PUT /auth/settings`). Mic loop `lib/voiceLoop.ts` (native SpeechRecognition): listen → silence sends → waits for start word.
+- Intro video plays after every sign-in (email, Google via session flag `pandi-intro-pending`, guest) with Skip / Esc / Space; a plain reload while signed in goes straight to chat.
 - Pages: /about, /privacy, /terms. Global Help button → mailto:pandiaimark2@gmail.com.
 - NOT built: device limits, plan card/plans page, Razorpay, image-upload→3D, OBJ download, GPS map, emailed parent verification, browser-only guest history.
 - Known: saved OPENAI_API_KEY is rejected by OpenAI (401) → OpenAI chat/images currently run through the Emergent key. Tripo key has no balance → 3D shows procedural preview (no credits charged).

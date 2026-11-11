@@ -10,6 +10,7 @@ export const KEYS = {
   model: "pandi-model",
   interfaceTheme: "pandi-interface-theme", // "agni" | "vajra"
   onboardingDone: "pandi-onboarding-done", // voice/text + theme steps finished
+  introPending: "pandi-intro-pending", // session flag: play the intro video once after a sign-in
   authMode: "pandi-auth-mode", // "user" (signed in) | "guest"
   guestId: "pandi-guest-id", // remembered guest profile while signed in
   guestName: "pandi-guest-name",
