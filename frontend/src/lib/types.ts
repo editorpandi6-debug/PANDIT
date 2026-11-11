@@ -142,6 +142,8 @@ export interface Creation {
   limitations: string;
   scene: SceneSpec;
   image_data_url: string | null;
+  model_url: string | null;
+  model_source: "tripo" | "procedural";
   created_at: string;
 }
 

@@ -54,15 +54,19 @@ DEFAULT_INTRO_VIDEO = "https://customer-assets-cm19k8pv.emergentagent.net/job_fe
 # provider, model — selectable from Settings; all served through the Emergent universal key
 MODELS: dict[str, tuple[str, str]] = {
     "gpt-5.1": ("openai", "gpt-5.1"),
-    "gemini-3-flash": ("gemini", "gemini-3-flash"),
+    "gemini-3-flash-preview": ("gemini", "gemini-3-flash-preview"),
     "gemini-3.1-pro-preview": ("gemini", "gemini-3.1-pro-preview"),
     "claude-sonnet-5-5": ("anthropic", "claude-sonnet-5-5"),
     "claude-opus-5-5": ("anthropic", "claude-opus-5-5"),
     "claude-haiku-4-5-20251001": ("anthropic", "claude-haiku-4-5-20251001"),
 }
 DEFAULT_MODEL = "gpt-5.1"
-FALLBACK_MODEL = "gemini-3-flash"
+FALLBACK_MODEL = "gemini-3-flash-preview"
 SEARCH_MODEL = "gemini-3.1-pro-preview"  # live Google Search grounding is Gemini-only
+
+# Real OpenAI model names (used only when the caller's own OPENAI_API_KEY is set — the
+# Emergent-proxy aliases like "gpt-5.1" are not valid model ids on the real OpenAI API).
+DIRECT_OPENAI_MODEL = "gpt-4.1"
 
 # --- hidden owner-console trigger: exact message "123P456P" (case-insensitive) ---
 ADMIN_CODE_PATTERN = re.compile(r"^[A-Za-z0-9]{4,16}$")
@@ -546,6 +550,8 @@ Recent conversation context:
         scene_emitted = None
         try:
             cand_key = _resolve_api_key(cand_provider) or api_key
+            if cand_provider == "openai" and cand_key == os.environ.get("OPENAI_API_KEY", "").strip() and cand_key:
+                cand_model = DIRECT_OPENAI_MODEL  # the real OpenAI API doesn't recognize Emergent's proxy aliases
             chat = LlmChat(api_key=cand_key, session_id=f"pandi-{request.session_id}", system_message=system_message).with_model(cand_provider, cand_model)
             if should_search:
                 chat = chat.with_tools([{"googleSearch": {}}])

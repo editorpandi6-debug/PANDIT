@@ -145,6 +145,8 @@ class Creation(BaseModel):
     limitations: str = ""
     scene: SceneSpec
     image_data_url: str | None = None
+    model_url: str | None = None
+    model_source: Literal["tripo", "procedural"] = "procedural"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("created_at", mode="after")

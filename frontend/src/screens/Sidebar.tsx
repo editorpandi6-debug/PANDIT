@@ -236,7 +236,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
   const [theme, setTheme] = useState<InterfaceTheme>(profile.theme);
   const models = useQuery({ queryKey: ["models"], queryFn: () => apiGet<ModelInfo[]>("/pandi/models"), enabled: open, staleTime: Infinity });
   const [model, setModel] = useState(storage.get(KEYS.model) ?? "gpt-5.1");
-  const MODEL_LABELS: Record<string, string> = { "gpt-5.1": "GPT-5.1 (primary)", "gemini-3-flash": "Gemini 3 Flash (fallback)", "gemini-3.1-pro-preview": "Gemini 3.1 Pro (live web search)", "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-opus-5-5": "Claude Opus 5.5", "claude-haiku-4-5-20251001": "Claude Haiku 4.5 (fastest)" };
+  const MODEL_LABELS: Record<string, string> = { "gpt-5.1": "GPT-5.1 (primary)", "gemini-3-flash-preview": "Gemini 3 Flash (fallback)", "gemini-3.1-pro-preview": "Gemini 3.1 Pro (live web search)", "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-opus-5-5": "Claude Opus 5.5", "claude-haiku-4-5-20251001": "Claude Haiku 4.5 (fastest)" };
   useEffect(() => {
     if (!("speechSynthesis" in window)) return;
     const refresh = () => setVoices(listBrowserVoices());

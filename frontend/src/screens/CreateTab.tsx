@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { ArcReactor } from "@/components/ArcReactor";
+import { GlbViewer } from "@/components/GlbViewer";
 import { VirtualLab } from "@/components/VirtualLab";
 import { apiGet, apiPost } from "@/lib/api";
 import type { Creation, CreationRequest, CreationSummary } from "@/lib/types";
@@ -93,7 +94,7 @@ export function CreateTab({ profileId }: Props) {
       {!generate.isPending && active && (
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto lg:flex-row">
           <div className="relative min-h-[320px] flex-1">
-            <VirtualLab spec={active.scene} messageId={active.id} tall />
+            {active.model_source === "tripo" && active.model_url ? <GlbViewer url={active.model_url} /> : <VirtualLab spec={active.scene} messageId={active.id} tall />}
           </div>
           <div className="hud-panel hud-corners w-full shrink-0 rounded-md p-4 lg:w-80" data-testid="create-details">
             <span className="hud-c" />
@@ -101,7 +102,9 @@ export function CreateTab({ profileId }: Props) {
               <img src={active.image_data_url} alt={active.name} className="mb-3 w-full rounded border border-[#ff8a1f]/25" data-testid="create-concept-image" />
             )}
             <h3 className="font-heading text-xs tracking-[0.25em] text-white glow-text">{active.name}</h3>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-[#ff8a1f]">{active.category}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-[#ff8a1f]">
+              {active.category} · {active.model_source === "tripo" ? "Tripo AI model" : "Procedural preview"}
+            </p>
             <p className="mt-2 text-sm text-[#ffe3b8]">{active.brief}</p>
             <div className="mt-3 flex items-start gap-2 rounded border border-[#ffb347]/30 bg-[#ffb347]/5 px-2.5 py-2 text-[11px] text-[#ffd27a]" data-testid="create-limitation-note">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
