@@ -112,7 +112,7 @@ class TodayResponse(BaseModel):
 
 class VoiceStatus(BaseModel):
     configured: bool
-    provider: Literal["elevenlabs", "browser"]
+    provider: Literal["fish_audio", "elevenlabs", "browser"]
     voice_id: str | None = None
     cloned: bool = False
     detail: str

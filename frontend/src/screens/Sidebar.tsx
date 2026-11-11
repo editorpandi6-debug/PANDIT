@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Check, Info, MessageSquare, Pencil, Plus, Search, Settings, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
-import { ArcReactor } from "@/components/ArcReactor";
+import { BrandLogo } from "@/components/BrandLogo";
+import { CreditsFooter } from "@/components/CreditsFooter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api";
-import { CREDITS, LOGO_URL, SCHOOL_THANKS } from "@/lib/brand";
+import { CREATOR_NAME } from "@/lib/brand";
 import { KEYS, storage } from "@/lib/storage";
 import type { InterfaceTheme } from "@/lib/theme";
 import { getPreferredVoice, listBrowserVoices, setPreferredVoice, setVoiceEnabled, useVoice } from "@/lib/voice";
@@ -58,8 +59,7 @@ export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplay
     <aside className="flex h-full w-full flex-col bg-[#050302]/95 text-[#ffe3b8]" data-testid="sidebar">
       <div className="flex items-center justify-between border-b border-[#ff8a1f]/15 px-4 py-3">
         <div className="flex items-center gap-2">
-          <img src={LOGO_URL} alt="PANDI AI" data-testid="brand-logo" className="h-7 w-7 rounded object-cover" />
-          <ArcReactor size={28} mode={voice.status === "speaking" ? "speaking" : "idle"} testId="sidebar-reactor" />
+          <BrandLogo variant="emblem" testId="brand-logo" className="h-9 w-9" />
           <span className="font-heading text-[11px] tracking-[0.25em] text-white">PANDI AI</span>
         </div>
         {onClose && (
@@ -262,7 +262,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="hud-panel border-[#ff8a1f]/30 text-[#fff5e8] sm:max-w-md" data-testid="settings-dialog">
+      <DialogContent className="hud-panel max-h-[90dvh] overflow-y-auto border-[#ff8a1f]/30 text-[#fff5e8] sm:max-w-md" data-testid="settings-dialog">
         <DialogHeader>
           <DialogTitle className="font-heading text-sm tracking-[0.2em] text-white">SETTINGS</DialogTitle>
           <DialogDescription className="text-xs text-[#d9a66a]">System configuration for PANDI AI Mark II.</DialogDescription>
@@ -273,7 +273,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
             <p className="mt-1 text-xs text-[#ffe3b8]">
               {status.data ? (
                 <>
-                  Provider: <b>{status.data.provider === "elevenlabs" ? (status.data.cloned ? "ElevenLabs · cloned PANDI voice" : "ElevenLabs · stock voice (clone unavailable)") : "Browser speech synthesis (fallback)"}</b>
+                  Provider: <b>{status.data.provider === "fish_audio" ? "Fish Audio · official PANDI voice" : status.data.provider === "elevenlabs" ? (status.data.cloned ? "ElevenLabs · cloned PANDI voice" : "ElevenLabs · stock voice (clone unavailable)") : "Browser speech synthesis (fallback)"}</b>
                   <br />
                   <span className="text-[#d9a66a]">{status.data.detail}</span>
                 </>
@@ -309,9 +309,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
               className="mt-1 h-9 w-full rounded border border-[#ff8a1f]/30 bg-[#050302] px-2 text-sm text-white focus:border-[#ff8a1f] focus:outline-none"
             >
               {(models.data ?? [{ id: "gemini-3.1-pro-preview", provider: "gemini", label: "gemini-3.1-pro-preview" }]).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {MODEL_LABELS[m.id] ?? m.label}
-                </option>
+                <option key={m.id} value={m.id} label={MODEL_LABELS[m.id] ?? m.label} data-testid={`settings-model-option-${m.id}`} />
               ))}
             </select>
             <span className="mt-1 block text-[10px] text-[#a8713a]">Questions needing current information always use Gemini live search.</span>
@@ -327,11 +325,9 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
               data-testid="settings-voice-select"
               className="mt-1 h-9 w-full rounded border border-[#ff8a1f]/30 bg-[#050302] px-2 text-sm text-white focus:border-[#ff8a1f] focus:outline-none"
             >
-              <option value="official">Official PANDI voice {status.data?.configured ? "(ElevenLabs)" : "(browser fallback until key is added)"}</option>
+              <option value="official" label={`Official PANDI voice ${status.data?.provider === "fish_audio" ? "(Fish Audio)" : status.data?.configured ? "(ElevenLabs)" : "(browser fallback)"}`} data-testid="settings-voice-option-official" />
               {voices.map((v) => (
-                <option key={v.name} value={v.name}>
-                  {v.name} · {v.lang}
-                </option>
+                <option key={v.name} value={v.name} label={`${v.name} · ${v.lang}`} data-testid={`settings-voice-option-${v.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`} />
               ))}
             </select>
           </label>
@@ -390,8 +386,9 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
             <p className="font-heading text-xs tracking-[0.25em] text-white">PANDI AI MARK II</p>
             <p className="mt-1 text-[11px] text-[#d9a66a]">Personalized Advanced Neural Digital Intelligence</p>
             <p className="mt-1 text-[11px] text-[#ffe3b8]">
-              Created by <b>VIGNEASHWAR</b>
+              Created by <b data-testid="about-creator-name">{CREATOR_NAME}</b>
             </p>
+            <CreditsFooter testId="about-footer-credits" className="mt-3 border-t border-[#ff8a1f]/20 pt-3" />
           </div>
         </div>
       </DialogContent>

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Play, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { ArcReactor } from "@/components/ArcReactor";
 import { HoloBackground } from "@/components/HoloBackground";
 import { apiGet } from "@/lib/api";
+import { INTRO_VIDEO_FALLBACK_URL, INTRO_VIDEO_URL, LOGO_URL } from "@/lib/brand";
 import type { IntroVideoResponse } from "@/lib/types";
 
 const BOOT_LINES = ["INITIALIZING NEURAL CORE", "LOADING HOLOGRAM ENGINE", "CALIBRATING VOICE MATRIX", "LINKING LIVE DATA FEEDS", "PANDI AI MARK II ONLINE"];
@@ -60,8 +61,17 @@ export function IntroScreen({ onDone }: { onDone: () => void }) {
   const [fading, setFading] = useState(false);
   const [fallback, setFallback] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [needsPlay, setNeedsPlay] = useState(false);
+  const [useWebm, setUseWebm] = useState(() => !document.createElement("video").canPlayType('video/mp4; codecs="avc1.64001f, mp4a.40.2"'));
   const doneRef = useRef(false);
   const video = useQuery({ queryKey: ["intro-video"], queryFn: () => apiGet<IntroVideoResponse>("/pandi/settings/intro-video"), staleTime: 60_000 });
+  const videoUrl = video.data?.video_url || INTRO_VIDEO_URL;
+  const playbackUrl = videoUrl === INTRO_VIDEO_URL && useWebm ? INTRO_VIDEO_FALLBACK_URL : videoUrl;
+
+  const mediaFailure = () => {
+    if (videoUrl === INTRO_VIDEO_URL && !useWebm) setUseWebm(true);
+    else setFallback(true);
+  };
 
   const finish = () => {
     if (doneRef.current) return;
@@ -78,19 +88,37 @@ export function IntroScreen({ onDone }: { onDone: () => void }) {
       }
     };
     window.addEventListener("keydown", onKey);
-    const safety = window.setTimeout(finish, 45_000); // never hang on a stalled video
+    // Only time out stalled playback, not a longer video that is still progressing.
+    let lastProgress = performance.now();
+    let lastTime = 0;
+    const safety = window.setInterval(() => {
+      const currentTime = videoRef.current?.currentTime ?? 0;
+      if (currentTime !== lastTime) {
+        lastTime = currentTime;
+        lastProgress = performance.now();
+      }
+      if (performance.now() - lastProgress > 20_000) finish();
+    }, 1000);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.clearTimeout(safety);
+      window.clearInterval(safety);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!video.isSuccess || fallback) return;
+    if (fallback) return;
+    let active = true;
     const v = videoRef.current;
-    v?.play().catch(() => setFallback(true)); // autoplay blocked or unsupported codec → generated intro
-  }, [video.isSuccess, fallback]);
+    v?.play().catch((error: DOMException) => {
+      if (!active || error.name === "AbortError") return;
+      if (error.name === "NotAllowedError") setNeedsPlay(true);
+      else mediaFailure();
+    });
+    return () => { active = false; };
+    // Media callbacks belong to the current source, not a superseded play promise.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playbackUrl, fallback]);
 
   const toggleSound = () => {
     const v = videoRef.current;
@@ -100,24 +128,37 @@ export function IntroScreen({ onDone }: { onDone: () => void }) {
     if (!v.muted) v.play().catch(() => undefined);
   };
 
-  const showVideo = !fallback && Boolean(video.data?.video_url);
+  const showVideo = !fallback;
 
   return (
     <div className={`fixed inset-0 z-50 bg-black transition-opacity duration-500 ${fading ? "opacity-0" : "opacity-100"}`} data-testid="intro-screen">
-      {showVideo && video.data ? (
+      {showVideo ? (
         <video
           ref={videoRef}
-          src={video.data.video_url}
+          src={playbackUrl}
+          poster={LOGO_URL}
+          preload="auto"
           className="h-full w-full object-contain"
           playsInline
           autoPlay
           muted
           onEnded={finish}
-          onError={() => setFallback(true)}
+          onPlaying={() => setNeedsPlay(false)}
+          onError={mediaFailure}
           data-testid="intro-video"
         />
       ) : (
         <AnimatedIntro onDone={finish} />
+      )}
+      {showVideo && needsPlay && (
+        <button
+          type="button"
+          data-testid="intro-play-button"
+          onClick={() => videoRef.current?.play().catch(mediaFailure)}
+          className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded border border-[#ff8a1f]/60 bg-black/80 px-5 py-3 text-white transition-colors hover:bg-[#ff8a1f]/30"
+        >
+          <Play size={18} /> Play intro
+        </button>
       )}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
         {showVideo && (

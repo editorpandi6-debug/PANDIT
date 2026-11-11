@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArcReactor } from "@/components/ArcReactor";
+import { BrandLogo } from "@/components/BrandLogo";
+import { CreditsFooter } from "@/components/CreditsFooter";
 import { HoloBackground } from "@/components/HoloBackground";
 import { apiPut } from "@/lib/api";
 import { KEYS, newId, storage } from "@/lib/storage";
@@ -45,7 +46,7 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4" data-testid="name-screen">
       <HoloBackground />
       <div className="screen-enter relative z-10 flex w-full max-w-md flex-col items-center text-center">
-        <ArcReactor size={168} mode="thinking" testId="name-screen-reactor" className="mb-10" beam />
+        <BrandLogo testId="name-screen-logo" className="mb-6 w-52 sm:w-64" />
         <h1 className="font-heading text-2xl font-bold tracking-[0.22em] text-white glow-text sm:text-3xl" data-testid="name-screen-title">
           PANDI AI MARK II
         </h1>
@@ -84,6 +85,7 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
           </p>
         )}
         <p className="mt-6 text-[10px] tracking-[0.3em] text-[#7a4a22]">PERSONALIZED ADVANCED NEURAL DIGITAL INTELLIGENCE</p>
+        <CreditsFooter testId="welcome-footer-credits" className="mt-6" />
       </div>
     </div>
   );

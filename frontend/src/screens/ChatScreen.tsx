@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AudioLines, Boxes, Menu, MessageSquareText, Mic, Plus, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { ArcReactor } from "@/components/ArcReactor";
+import { BrandLogo } from "@/components/BrandLogo";
+import { CreditsFooter } from "@/components/CreditsFooter";
 import { HoloBackground } from "@/components/HoloBackground";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ApiError, apiGet, apiStream } from "@/lib/api";
@@ -302,7 +304,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
               {empty && (
                 <div className="animate-fade-up">
                   <div className="mb-6 flex flex-col items-center text-center">
-                    <ArcReactor size={120} mode={reactorMode} className="mb-7" testId="hero-reactor" beam />
+                    <BrandLogo testId="chat-hero-logo" className="mb-5 w-40 sm:w-48" />
                     <h2 className="font-heading text-lg tracking-[0.22em] text-white glow-text">PANDI AI MARK II</h2>
                     <p className="mt-1 font-heading text-[9px] tracking-[0.4em] text-[#ff8a1f]">THE HOLOGRAM INTELLIGENCE</p>
                   </div>
@@ -341,7 +343,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
               <AudioLines size={16} /> TALK
             </button>
           </div>
-          <p className="mt-1.5 text-center text-[9px] tracking-[0.25em] text-[#7a4a22]">PANDI AI MARK II · CREATED BY VIGNEASHWAR · {voice.provider === "elevenlabs" ? "OFFICIAL VOICE" : voice.provider === "browser" ? "FALLBACK VOICE" : "VOICE READY"}</p>
+          <CreditsFooter testId="chat-footer-credits" className="mx-auto mt-2 max-w-3xl" />
         </div>
       </main>
 

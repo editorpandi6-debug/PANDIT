@@ -109,7 +109,7 @@ export interface TodayResponse {
 
 export interface VoiceStatus {
   configured: boolean;
-  provider: "elevenlabs" | "browser";
+  provider: "fish_audio" | "elevenlabs" | "browser";
   voice_id: string | null;
   cloned: boolean;
   detail: string;

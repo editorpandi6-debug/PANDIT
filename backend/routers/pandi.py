@@ -49,7 +49,7 @@ router = APIRouter(prefix="/pandi", tags=["pandi"])
 UPLOAD_DIR = Path("/tmp/pandi_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_INTRO_VIDEO = "https://customer-assets-cm19k8pv.emergentagent.net/job_feee3313-d0c0-4676-bacb-c576a9e7f582/artifacts/920bea1d75fb9cfe_Pandi_AI_Mark_II_title_20261006095531.mp4"
+DEFAULT_INTRO_VIDEO = "https://customer-assets-gfyr7b9c.emergentagent.net/job_pandi-ai-mark2/artifacts/235864699c4b259d_WhatsApp%20Video%202026-11-07%20at%2019.07.03.mp4"
 
 # provider, model — selectable from Settings; all served through the Emergent universal key
 MODELS: dict[str, tuple[str, str]] = {
