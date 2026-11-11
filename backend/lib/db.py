@@ -26,6 +26,17 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("session_id", ASCENDING)], name="session_id_unique", unique=True),
         IndexModel([("profile_id", ASCENDING), ("updated_at", DESCENDING)], name="profile_updated"),
     ],
+    "users": [
+        IndexModel([("user_id", ASCENDING)], name="user_id_unique", unique=True),
+        IndexModel([("email", ASCENDING)], name="email_unique", unique=True),
+    ],
+    "user_sessions": [
+        IndexModel([("session_token", ASCENDING)], name="session_token_unique", unique=True),
+        IndexModel([("expires_at", ASCENDING)], name="expires_ttl", expireAfterSeconds=0),
+    ],
+    "pandi_usage": [IndexModel([("owner", ASCENDING), ("day", ASCENDING)], name="owner_day_unique", unique=True)],
+    "pandi_images": [IndexModel([("image_id", ASCENDING)], name="image_id_unique", unique=True)],
+    "pandi_creations": [IndexModel([("profile_id", ASCENDING), ("created_at", DESCENDING)], name="profile_created")],
     "pandi_settings": [IndexModel([("key", ASCENDING)], name="key_unique", unique=True)],
 }
 

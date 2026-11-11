@@ -45,6 +45,7 @@ export interface ChatMessage {
   sources: SourceRef[];
   scene: SceneSpec | null;
   attachments: string[];
+  image_url: string | null;
 }
 
 export interface ChatHistory {
@@ -85,6 +86,8 @@ export interface ChatStreamRequest {
   language?: string;
   model?: string;
   use_live_search?: boolean;
+  force_search?: boolean;
+  force_image?: boolean;
   file_ids?: string[];
 }
 
@@ -144,6 +147,7 @@ export interface Creation {
   image_data_url: string | null;
   model_url: string | null;
   model_source: "tripo" | "procedural";
+  credits_charged: number;
   created_at: string;
 }
 
@@ -171,4 +175,70 @@ export interface OwnerOverview {
 export interface OwnerEvent {
   action: "claimed" | "opened";
   recovery_key: string | null;
+}
+
+// ---- mirrors of backend/models/account.py ----
+export interface UserSettings {
+  voice_speed: number;
+  silence_ms: number;
+  start_word: string;
+  wake_enabled: boolean;
+  large_text: boolean;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  name: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface GoogleSessionRequest {
+  session_id: string;
+}
+
+export interface AgeUpdate {
+  age: number;
+  parent_email?: string | null;
+  parent_consent?: boolean;
+}
+
+export interface AuthUser {
+  user_id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  provider: "google" | "email";
+  age: number | null;
+  parent_email: string | null;
+  parent_consent: boolean;
+  needs_age: boolean;
+  needs_consent: boolean;
+  settings: UserSettings;
+}
+
+export interface CreditEvent {
+  kind: "image" | "3d" | "refund";
+  credits: number;
+  note: string;
+  at: string;
+}
+
+export interface CreditStatus {
+  tier: "Guest" | "Member";
+  credits_total: number;
+  credits_left: number;
+  images_total: number;
+  images_used: number;
+  images_left: number;
+  seconds_to_reset: number;
+  low: boolean;
+  locked: boolean;
+  image_cost: number;
+  model3d_cost: number;
+  events: CreditEvent[];
 }

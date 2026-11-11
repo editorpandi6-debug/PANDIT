@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { ArcReactor } from "@/components/ArcReactor";
 import { GlbViewer } from "@/components/GlbViewer";
 import { VirtualLab } from "@/components/VirtualLab";
-import { apiGet, apiPost } from "@/lib/api";
+import { ApiError, apiGet, apiPost } from "@/lib/api";
+import { creditsKey } from "@/lib/credits";
 import type { Creation, CreationRequest, CreationSummary } from "@/lib/types";
 
 const EXAMPLES = ["A modern electric sports car", "A minimalist wooden dining chair", "A small lighthouse on a cliff", "A wireless gaming mouse", "A friendly cartoon dragon"];
@@ -31,7 +32,11 @@ export function CreateTab({ profileId }: Props) {
       setActive(creation);
       void qc.invalidateQueries({ queryKey: ["creation-gallery", profileId] });
     },
-    onError: () => toast.error("PANDI could not design that model. Please try again."),
+    onError: (err) => {
+      const detail = err instanceof ApiError && err.body && typeof err.body === "object" && "detail" in err.body ? String((err.body as { detail: unknown }).detail) : null;
+      toast.error(detail ?? "Pandi could not design that model. No credits were used — please try again.");
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: creditsKey(profileId) }),
   });
 
   const openSaved = async (id: string) => {
@@ -55,7 +60,7 @@ export function CreateTab({ profileId }: Props) {
       <form onSubmit={submit} className="hud-panel hud-corners rounded-md p-3">
         <span className="hud-c" />
         <p className="mb-2 flex items-center gap-1 font-heading text-[9px] tracking-[0.3em] text-[#ff8a1f]">
-          <Wand2 size={10} /> DESCRIBE WHAT TO BUILD
+          <Wand2 size={10} /> DESCRIBE WHAT TO BUILD · 15 CREDITS PER 3D MODEL
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -106,6 +111,11 @@ export function CreateTab({ profileId }: Props) {
               {active.category} · {active.model_source === "tripo" ? "Tripo AI model" : "Procedural preview"}
             </p>
             <p className="mt-2 text-sm text-[#ffe3b8]">{active.brief}</p>
+            {active.model_url && (
+              <a href={active.model_url} download target="_blank" rel="noreferrer noopener" data-testid="create-download-glb" className="mt-3 inline-flex items-center gap-1 rounded border border-[#ff8a1f]/50 bg-[#ff8a1f]/10 px-2.5 py-1 text-xs text-white hover:bg-[#ff8a1f]/25">
+                Download GLB
+              </a>
+            )}
             <div className="mt-3 flex items-start gap-2 rounded border border-[#ffb347]/30 bg-[#ffb347]/5 px-2.5 py-2 text-[11px] text-[#ffd27a]" data-testid="create-limitation-note">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
               <span>{active.limitations}</span>

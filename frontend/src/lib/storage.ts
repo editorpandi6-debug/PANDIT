@@ -10,6 +10,11 @@ export const KEYS = {
   model: "pandi-model",
   interfaceTheme: "pandi-interface-theme", // "agni" | "vajra"
   onboardingDone: "pandi-onboarding-done", // voice/text + theme steps finished
+  authMode: "pandi-auth-mode", // "user" (signed in) | "guest"
+  guestId: "pandi-guest-id", // remembered guest profile while signed in
+  guestName: "pandi-guest-name",
+  settings: "pandi-settings", // voice speed, silence delay, start word, large text
+  searchToggle: "pandi-search-toggle", // chat "Search" toggle
 } as const;
 
 export const storage = {

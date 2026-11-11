@@ -1,4 +1,20 @@
-# PANDI AI — Living Spec
+# Pandi AI Mark 2 — Living Spec
+
+## CURRENT STATE (Nov 2026 build — supersedes older notes below)
+- Name everywhere: **Pandi AI Mark 2**. Credits (exact): AI developed by Vigneashwar · Asset developed by Sabari Sahishnu · Promoted by Shahirul Umar · Thanks to RPS Rathinam International Public School (footer, /about, Settings, auth screen, and sidebar search for "Pandi AI Mark 2").
+- Logo: static image removed. `components/PortalLogo.tsx` (SVG+CSS portal; click = 1s fast spin, hover glow, `mode="thinking"` pulse, `flashKey` flash, static on reduced-motion/low-power). `BrandLogo` wraps it.
+- **Pricing plans/Razorpay REMOVED by user choice.** Two tiers only: Guest (10 credits, 2 images/day) and Member = any signed-in user (50 credits, 7 images/day). Env overrides: CREDITS_DAILY_GUEST, CREDITS_DAILY_MEMBER, IMAGE_DAILY_LIMIT_GUEST, IMAGE_DAILY_LIMIT_PAID, LOCK_CHAT_AT_ZERO (default true).
+- Credits (`lib/credits.py`, collection `pandi_usage` {owner, day(IST), credits_used, images_used, events}): image 5 + 1 slot, 3D 15 (refunded when only the procedural preview is produced), chat free. Reset 00:00 IST. Failed image → refund. At 0 credits chat AND tools lock (HTTP 402 + `LockOverlay`, key-unlock animation when server reports credits again).
+- Auth (`routers/auth.py`, `lib/auth.py`): email+password (bcrypt), Emergent Google sign-in (`/auth/google/session`), guest. Session = httpOnly `session_token` cookie, collections `users`, `user_sessions`. Account chat profile_id == user_id (`user_…`); those profiles/sessions require the matching session. Guests use a random browser id (history stored server-side under that id).
+- Age: `PUT /auth/age` (5–75, 75 = 75+). Under 18 needs parent email + consent checkbox (self-attested, not email-verified). Chat/creation return 403 until done. Age bands drive the system prompt, safe search and image prompt rules (`lib/safety.py`); guests are treated as teens.
+- Models: `config/models.py` (chat dropdown in the input bar; default OpenAI). Chain: owner OPENAI_API_KEY → Emergent key same model → Gemini Flash.
+- Live search: chat "Search" toggle (`force_search`) + auto-search for current-info questions. Uses Tavily when TAVILY_API_KEY is set (`lib/search.py`), otherwise built-in Google-grounded Gemini. Sources shown under answers.
+- Images: chat detects "draw…/create a picture…" or the "Create image, N left today" button (`force_image`). `lib/images.py`: owner key gpt-image-1 → Emergent key gpt-image-2; stored in `pandi_images`, served at `/api/pandi/images/{id}` (+`?download=1`).
+- Voice: speed 0.5–2x, silence delay, start word ("Hey Pandi"), wake toggle, larger text in Settings (`lib/settings.ts`, saved to account via `PUT /auth/settings`). Mic loop `lib/voiceLoop.ts` (native SpeechRecognition): listen → silence sends → waits for start word.
+- Pages: /about, /privacy, /terms. Global Help button → mailto:pandiaimark2@gmail.com.
+- NOT built: device limits, plan card/plans page, Razorpay, image-upload→3D, OBJ download, GPS map, emailed parent verification, browser-only guest history.
+- Known: saved OPENAI_API_KEY is rejected by OpenAI (401) → OpenAI chat/images currently run through the Emergent key. Tripo key has no balance → 3D shows procedural preview (no credits charged).
+
 
 ## Latest user request: implementation checklist only
 - User supplied an expanded specification and then explicitly requested: **excluding payment flow, check whether every other update is done and provide a tick list**. Do not represent that specification as already implemented. No new app features were built during this status check.

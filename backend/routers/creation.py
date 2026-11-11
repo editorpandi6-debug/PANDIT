@@ -13,11 +13,14 @@ import os
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
 
+from lib.auth import authorize_profile
+from lib.credits import MODEL3D_COST, charge, owner_key, refund
 from lib.db import db
+from lib.images import generate_image_bytes
 from models.pandi import Creation, CreationRequest, CreationSummary, SceneSpec
 
 logger = logging.getLogger(__name__)
@@ -136,25 +139,30 @@ async def _design_brief(prompt: str) -> dict:
 
 
 async def _concept_image(category: str, name: str, brief: str) -> str | None:
-    api_key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
-    if not api_key:
-        return None
     try:
-        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
-
-        gen = OpenAIImageGeneration(api_key=api_key)
         prompt = f"Clean concept reference image of a {category}: {name}. {brief} Studio lighting, neutral grey background, product/concept-art style, single object, no text."
-        images = await gen.generate_images(prompt=prompt, model="gpt-image-1", number_of_images=1, quality="low")
-        if not images:
-            return None
-        return "data:image/png;base64," + base64.b64encode(images[0]).decode()
+        data = await generate_image_bytes(prompt, max_px=512)
+        return "data:image/jpeg;base64," + base64.b64encode(data).decode()
     except Exception:
         logger.warning("Concept image generation failed for %s/%s", category, name, exc_info=True)
         return None
 
 
 @router.post("/generate", response_model=Creation)
-async def generate_creation(request: CreationRequest) -> Creation:
+async def generate_creation(request: CreationRequest, http_request: Request) -> Creation:
+    await authorize_profile(http_request, request.profile_id, ready=True)
+    owner, is_user = owner_key(request.profile_id)
+    ok, _blocked = await charge(owner, is_user, MODEL3D_COST, "3d", request.prompt)
+    if not ok:
+        raise HTTPException(status_code=402, detail=f"A 3D model needs {MODEL3D_COST} credits. Your credits reset at 00:00 IST.")
+    try:
+        return await _generate(request, owner)
+    except Exception:
+        await refund(owner, MODEL3D_COST, "3D failed — refunded")
+        raise
+
+
+async def _generate(request: CreationRequest, owner: str) -> Creation:
     data = await _design_brief(request.prompt)
     objects = data.get("objects") or _fallback_scene(request.prompt)["objects"]
     scene = SceneSpec(
@@ -164,10 +172,11 @@ async def generate_creation(request: CreationRequest) -> Creation:
         steps=[],
         stats=[str(data.get("category", "object")).upper(), f"{len(objects)} parts"],
     )
-    image_data_url = await _concept_image(data.get("category", "object"), data.get("name", request.prompt), data.get("brief", ""))
-
     tripo_prompt = f"{data.get('name', request.prompt)}: {data.get('brief', request.prompt)}"
-    model_url, tripo_error = await _tripo_generate(tripo_prompt)
+    image_data_url, (model_url, tripo_error) = await asyncio.gather(
+        _concept_image(data.get("category", "object"), data.get("name", request.prompt), data.get("brief", "")),
+        _tripo_generate(tripo_prompt),
+    )
     limitations = data.get(
         "limitations",
         "This is a procedural primitive-shape model, not a photorealistic scan. True photorealism needs an external paid 3D-generation service, which is not connected to this app.",
@@ -179,6 +188,12 @@ async def generate_creation(request: CreationRequest) -> Creation:
     elif _tripo_key():
         # A Tripo key is configured but this generation failed/timed out — be honest, not silent.
         limitations = f"{tripo_error or 'Tripo generation did not complete.'} Showing the procedural preview instead."
+    credits_charged = MODEL3D_COST
+    if not model_url:
+        # Only a real Tripo mesh costs credits; the procedural preview is free.
+        await refund(owner, MODEL3D_COST, "3D preview only — refunded")
+        credits_charged = 0
+        limitations += " No credits were charged for this preview."
 
     creation = Creation(
         profile_id=request.profile_id,
@@ -191,13 +206,15 @@ async def generate_creation(request: CreationRequest) -> Creation:
         image_data_url=image_data_url,
         model_url=model_url,
         model_source=model_source,
+        credits_charged=credits_charged,
     )
     await db.pandi_creations.insert_one(creation.model_dump())
     return creation
 
 
 @router.get("/gallery/{profile_id}", response_model=list[CreationSummary])
-async def list_gallery(profile_id: str) -> list[CreationSummary]:
+async def list_gallery(profile_id: str, http_request: Request) -> list[CreationSummary]:
+    await authorize_profile(http_request, profile_id)
     rows = await db.pandi_creations.find({"profile_id": profile_id}).sort("created_at", -1).to_list(60)
     return [CreationSummary(**row) for row in rows]
 

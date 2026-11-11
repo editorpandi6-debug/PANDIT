@@ -4,17 +4,21 @@ import { AudioLines, Boxes, Menu, MessageSquareText, Mic, Plus, Sparkles, X } fr
 import { toast } from "sonner";
 import { ArcReactor } from "@/components/ArcReactor";
 import { BrandLogo } from "@/components/BrandLogo";
+import { CreditBar } from "@/components/CreditBar";
+import { LockOverlay } from "@/components/LockOverlay";
+import { PortalLogo } from "@/components/PortalLogo";
 import { CreditsFooter } from "@/components/CreditsFooter";
 import { HoloBackground } from "@/components/HoloBackground";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ApiError, apiGet, apiStream } from "@/lib/api";
+import { creditsKey, useCredits } from "@/lib/credits";
 import { useSpeechRecognition } from "@/lib/speech";
 import { KEYS, newId, storage } from "@/lib/storage";
 import { speak, stopSpeaking, useVoice } from "@/lib/voice";
-import type { ChatHistory, ChatMessage, ChatStreamRequest, FileUploadResponse, OwnerEvent, Profile, SceneSpec } from "@/lib/types";
+import type { AuthUser, ChatHistory, ChatMessage, ChatStreamRequest, FileUploadResponse, OwnerEvent, Profile, SceneSpec } from "@/lib/types";
 import { CreateTab } from "./CreateTab";
 import { HologramLabTab } from "./HologramLabTab";
-import { InputBar } from "./InputBar";
+import { InputBar, type SendOptions } from "./InputBar";
 import { MessageBubble } from "./MessageBubble";
 import { OwnerConsole } from "./OwnerConsole";
 import { Sidebar } from "./Sidebar";
@@ -30,11 +34,15 @@ type Tab = "chat" | "lab" | "create";
 
 interface Props {
   profile: Profile;
+  /** Signed-in account, or null for a guest. */
+  account: AuthUser | null;
   onReplayIntro: () => void;
   onResetProfile: () => void;
+  onSignOut: () => void;
+  onSignIn: () => void;
 }
 
-export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
+export function ChatScreen({ profile, account, onReplayIntro, onResetProfile, onSignOut, onSignIn }: Props) {
   const qc = useQueryClient();
   const voice = useVoice();
   const [sessionId, setSessionId] = useState(() => storage.get(KEYS.sessionId) ?? newId());
@@ -47,10 +55,14 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
   const [greeting, setGreeting] = useState<ChatMessage | null>(null);
   const [ownerEvent, setOwnerEvent] = useState<OwnerEvent | null>(null);
   const [ownerConsoleOpen, setOwnerConsoleOpen] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
+  const [thinkingLabel, setThinkingLabel] = useState<string | undefined>(undefined);
+  const credits = useCredits(profile.profile_id);
+  const locked = credits.status?.locked ?? false;
   const greetedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const sendRef = useRef<(text: string, files: FileUploadResponse[]) => Promise<void>>(async () => {});
+  const sendRef = useRef<(text: string, files: FileUploadResponse[], opts?: SendOptions) => Promise<void>>(async () => {});
 
   useEffect(() => storage.set(KEYS.sessionId, sessionId), [sessionId]);
 
@@ -83,8 +95,8 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
     if ((history.data?.messages.length ?? 0) > 0) return;
     const hour = new Date().getHours();
     const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-    const text = `${part}, ${profile.name}. PANDI AI Mark II is online and all systems are nominal. What shall we explore today?`;
-    const msg: ChatMessage = { id: `greeting-${sessionId}`, session_id: sessionId, role: "assistant", content: text, created_at: new Date().toISOString(), live_search: false, sources: [], scene: null, attachments: [] };
+    const text = `${part}, ${profile.name}. Pandi AI Mark 2 is online and all systems are nominal. What shall we explore today?`;
+    const msg: ChatMessage = { id: `greeting-${sessionId}`, session_id: sessionId, role: "assistant", content: text, created_at: new Date().toISOString(), live_search: false, sources: [], scene: null, attachments: [], image_url: null };
     setGreeting(msg);
     void speak(msg.id, text);
   }, [history.isSuccess, history.data, profile.name, sessionId]);
@@ -107,10 +119,11 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
   const newChat = useCallback(() => switchSession(newId()), [switchSession]);
 
   const send = useCallback(
-    async (text: string, files: FileUploadResponse[]) => {
-      if (draft) return;
+    async (text: string, files: FileUploadResponse[], opts?: SendOptions) => {
+      if (draft || locked) return;
       stopSpeaking();
-      const userMsg: ChatMessage = { id: newId(), session_id: sessionId, role: "user", content: text, created_at: new Date().toISOString(), live_search: false, sources: [], scene: null, attachments: files.map((f) => f.filename) };
+      const userMsg: ChatMessage = { id: newId(), session_id: sessionId, role: "user", content: text, created_at: new Date().toISOString(), live_search: false, sources: [], scene: null, attachments: files.map((f) => f.filename), image_url: null };
+      setThinkingLabel(opts?.forceImage ? "CREATING YOUR IMAGE…" : opts?.forceSearch ? "SEARCHING THE LIVE WEB…" : undefined);
       setPendingUser(userMsg);
       const draftId = newId();
       setDraft({ ...userMsg, id: draftId, role: "assistant", content: "", attachments: [] });
@@ -121,6 +134,8 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
         language: "auto",
         model: storage.get(KEYS.model) ?? "gpt-5.1",
         use_live_search: storage.get(KEYS.liveSearch) !== "off",
+        force_search: Boolean(opts?.forceSearch),
+        force_image: Boolean(opts?.forceImage),
         file_ids: files.map((f) => f.file_id),
       };
       const controller = new AbortController();
@@ -136,7 +151,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
         if (!reader) throw new Error("No stream");
         const decoder = new TextDecoder();
         let buffer = "";
-        const timeout = window.setTimeout(() => controller.abort(), 90_000);
+        const timeout = window.setTimeout(() => controller.abort(), 150_000);
         controller.signal.addEventListener("abort", () => reader.cancel().catch(() => undefined));
         for (;;) {
           const { value, done } = await reader.read();
@@ -179,10 +194,14 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
         window.clearTimeout(timeout);
       } catch (err) {
         if (controller.signal.aborted) failed = failed ?? "The response was interrupted. You can retry your question.";
-        else if (err instanceof ApiError) failed = `PANDI could not reach its AI core (HTTP ${err.status}).`;
+        else if (err instanceof ApiError) {
+          const detail = (err.body as { detail?: unknown } | null)?.detail;
+          failed = typeof detail === "string" ? detail : `Pandi could not reach its AI core (HTTP ${err.status}).`;
+        }
         else failed = "Connection to the PANDI core was lost. Please try again.";
       }
       abortRef.current = null;
+      void qc.invalidateQueries({ queryKey: creditsKey(profile.profile_id) });
       if (failed && !content) {
         toast.error(failed);
         setDraft(null);
@@ -194,10 +213,13 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
       void qc.invalidateQueries({ queryKey: ["sessions", profile.profile_id] });
       setDraft(null);
       setPendingUser(null);
-      if (content) void speak(finalId, content);
+      if (content) {
+        setFlashKey((k) => k + 1);
+        void speak(finalId, content);
+      }
       if (ownerPayload) setOwnerConsoleOpen(true);
     },
-    [draft, profile.profile_id, qc, sessionId],
+    [draft, locked, profile.profile_id, qc, sessionId],
   );
   sendRef.current = send;
 
@@ -232,11 +254,13 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
   const initial = profile.name.charAt(0).toUpperCase();
 
   const sidebar = (
-    <Sidebar profile={profile} sessionId={sessionId} onNewChat={newChat} onOpenSession={switchSession} onReplayIntro={onReplayIntro} onResetProfile={onResetProfile} onClose={() => setMenuOpen(false)} />
+    <Sidebar profile={profile} account={account} onSignOut={onSignOut} onSignIn={onSignIn} sessionId={sessionId} onNewChat={newChat} onOpenSession={switchSession} onReplayIntro={onReplayIntro} onResetProfile={onResetProfile} onClose={() => setMenuOpen(false)} />
   );
 
   return (
-    <div className="screen-enter relative flex h-screen overflow-hidden" data-testid="chat-screen">
+    <div className="screen-enter relative flex h-screen overflow-hidden pt-9" data-testid="chat-screen">
+      <CreditBar profileId={profile.profile_id} isUser={Boolean(account)} onSignIn={onSignIn} />
+      <LockOverlay profileId={profile.profile_id} isUser={Boolean(account)} onSignIn={onSignIn} onSignOut={onSignOut} />
       <HoloBackground particles={18} />
       <div className="relative z-10 hidden w-72 shrink-0 border-r border-[#ff8a1f]/15 lg:block">{sidebar}</div>
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -252,10 +276,10 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
             <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu" data-testid="menu-button" className="rounded border border-[#ff8a1f]/30 p-2 text-[#ffd27a] hover:border-[#ff8a1f] hover:text-white lg:hidden">
               <Menu size={16} />
             </button>
-            <ArcReactor size={34} mode={reactorMode} testId="header-reactor" />
+            <PortalLogo testId="header-portal" className="w-9" mode={draft ? "thinking" : "idle"} flashKey={flashKey} />
             <div>
               <p className="font-heading text-xs tracking-[0.3em] text-white glow-text" data-testid="header-title">
-                PANDI AI
+                PANDI AI MARK 2
               </p>
               <p className="font-heading text-[8px] tracking-[0.3em] text-[#ff8a1f]" data-testid="header-status">
                 {reactorMode === "thinking" ? "PROCESSING" : reactorMode === "speaking" ? "SPEAKING" : reactorMode === "listening" ? "LISTENING" : "ONLINE"}
@@ -288,7 +312,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
           </div>
         ) : (
           <div ref={scrollRef} className="screen-enter flex-1 overflow-y-auto px-3 py-4 sm:px-6" data-testid="message-list">
-            <div className="mx-auto flex max-w-3xl flex-col gap-5">
+            <div className="lt-zoom mx-auto flex max-w-3xl flex-col gap-5">
               {history.isLoading && (
                 <div className="flex flex-col items-center gap-3 py-16" data-testid="history-loading">
                   <ArcReactor size={64} mode="thinking" testId="history-loading-reactor" />
@@ -305,7 +329,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
                 <div className="animate-fade-up">
                   <div className="mb-6 flex flex-col items-center text-center">
                     <BrandLogo testId="chat-hero-logo" className="mb-5 w-40 sm:w-48" />
-                    <h2 className="font-heading text-lg tracking-[0.22em] text-white glow-text">PANDI AI MARK II</h2>
+                    <h2 className="font-heading text-lg tracking-[0.22em] text-white glow-text">PANDI AI MARK 2</h2>
                     <p className="mt-1 font-heading text-[9px] tracking-[0.4em] text-[#ff8a1f]">THE HOLOGRAM INTELLIGENCE</p>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2" data-testid="suggestion-cards">
@@ -320,7 +344,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
                 </div>
               )}
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} streaming={draft?.id === m.id} operatorInitial={initial} />
+                <MessageBubble key={m.id} message={m} streaming={draft?.id === m.id} operatorInitial={initial} thinkingLabel={thinkingLabel} />
               ))}
             </div>
           </div>
@@ -329,11 +353,12 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
         <div className="border-t border-[#ff8a1f]/15 bg-[#000000]/70 px-3 py-3 backdrop-blur sm:px-6">
           <div className="mx-auto flex max-w-3xl items-end gap-2">
             <div className="min-w-0 flex-1">
-              <InputBar disabled={Boolean(draft)} onSend={(t, f) => void send(t, f)} onListeningChange={setListening} />
+              <InputBar disabled={Boolean(draft) || locked} credits={credits.status} onSend={(t, f, o) => void send(t, f, o)} onListeningChange={setListening} />
             </div>
             <button
               type="button"
               onClick={() => (voiceMode ? exitVoiceMode() : setVoiceMode(true))}
+              disabled={locked}
               title="Voice conversation mode"
               aria-label="Voice conversation mode"
               data-testid="voice-mode-button"
@@ -358,7 +383,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
               <span key={i} className={`w-1.5 rounded-sm bg-[#ff8a1f] ${voice.status === "speaking" || handsFree.listening ? "animate-wave" : ""}`} style={{ height: voice.status === "speaking" || handsFree.listening ? "100%" : "15%", animationDelay: `${i * 0.06}s`, opacity: 0.5 + (i % 3) * 0.2 }} />
             ))}
           </div>
-          <p className="mt-4 max-w-md px-6 text-center text-sm text-[#ffe3b8]">{handsFree.interim || (draft?.content ? draft.content.slice(0, 160) : "Speak naturally — PANDI replies out loud and listens again.")}</p>
+          <p className="mt-4 max-w-md px-6 text-center text-sm text-[#ffe3b8]">{handsFree.interim || (draft?.content ? draft.content.slice(0, 160) : "Speak naturally — Pandi replies out loud and listens again.")}</p>
           <button type="button" onClick={exitVoiceMode} data-testid="voice-mode-exit" className="mt-8 inline-flex items-center gap-2 rounded border border-[#ff8a1f]/60 bg-black/60 px-5 py-2 font-heading text-[11px] tracking-[0.25em] text-white hover:bg-[#ff8a1f]/25">
             <X size={14} /> EXIT VOICE MODE
           </button>

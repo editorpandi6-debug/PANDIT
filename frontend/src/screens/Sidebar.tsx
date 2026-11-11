@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, Check, Info, MessageSquare, Pencil, Plus, Search, Settings, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { Brain, Check, Info, LogIn, LogOut, MessageSquare, Pencil, Plus, Search, Settings, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
 import { CreditsFooter } from "@/components/CreditsFooter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api";
-import { CREATOR_NAME } from "@/lib/brand";
+import { APP_FULL_FORM } from "@/lib/brand";
+import { updateSettings, useSettings } from "@/lib/settings";
 import { KEYS, storage } from "@/lib/storage";
 import type { InterfaceTheme } from "@/lib/theme";
-import { getPreferredVoice, listBrowserVoices, setPreferredVoice, setVoiceEnabled, useVoice } from "@/lib/voice";
-import type { ChatSession, MemoryUpdate, ModelInfo, Profile, ProfileUpsert, SessionRename, VoiceStatus } from "@/lib/types";
+import { applyVoiceSpeed, getPreferredVoice, listBrowserVoices, setPreferredVoice, setVoiceEnabled, useVoice } from "@/lib/voice";
+import type { AuthUser, ChatSession, MemoryUpdate, ModelInfo, Profile, ProfileUpsert, SessionRename, VoiceStatus } from "@/lib/types";
 
 interface Props {
   profile: Profile;
+  account: AuthUser | null;
+  onSignOut: () => void;
+  onSignIn: () => void;
   sessionId: string;
   onNewChat: () => void;
   onOpenSession: (id: string) => void;
@@ -22,7 +27,7 @@ interface Props {
   onClose?: () => void;
 }
 
-export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplayIntro, onResetProfile, onClose }: Props) {
+export function Sidebar({ profile, account, onSignOut, onSignIn, sessionId, onNewChat, onOpenSession, onReplayIntro, onResetProfile, onClose }: Props) {
   const qc = useQueryClient();
   const voice = useVoice();
   const [memoryOpen, setMemoryOpen] = useState(false);
@@ -60,7 +65,7 @@ export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplay
       <div className="flex items-center justify-between border-b border-[#ff8a1f]/15 px-4 py-3">
         <div className="flex items-center gap-2">
           <BrandLogo variant="emblem" testId="brand-logo" className="h-9 w-9" />
-          <span className="font-heading text-[11px] tracking-[0.25em] text-white">PANDI AI</span>
+          <span className="font-heading text-[11px] tracking-[0.2em] text-white">PANDI AI MARK 2</span>
         </div>
         {onClose && (
           <button type="button" onClick={onClose} aria-label="Close menu" data-testid="sidebar-close" className="text-[#ffd27a] hover:text-white lg:hidden">
@@ -86,6 +91,12 @@ export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplay
           <Search size={12} className="shrink-0 text-[#a8713a]" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search chats" aria-label="Search chats" data-testid="chat-search-input" className="h-8 w-full bg-transparent text-xs text-white placeholder:text-[#7a4a22] focus:outline-none" />
         </div>
+        {/pandi\s*ai(\s*mark\s*(2|ii))?/i.test(search.trim()) && (
+          <div className="mb-2 rounded border border-[#ff8a1f]/30 bg-black/50 p-2" data-testid="search-credits-block">
+            <p className="mb-1 text-center font-heading text-[10px] tracking-[0.2em] text-white">PANDI AI MARK 2</p>
+            <CreditsFooter testId="search-credits" />
+          </div>
+        )}
         {sessions.isError && <p className="px-1 text-xs text-[#a8713a]">History unavailable right now.</p>}
         {sessions.data?.length === 0 && <p className="px-1 text-xs text-[#a8713a]">No chats yet. Ask PANDI something.</p>}
         <ul className="space-y-1">
@@ -164,7 +175,7 @@ export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplay
         <div className="mt-2 flex items-center gap-2 rounded border border-[#ff8a1f]/20 bg-black/40 px-2 py-2" data-testid="sidebar-operator">
           <div className="flex h-7 w-7 items-center justify-center rounded-full border border-[#ff8a1f]/40 font-heading text-[11px] text-[#ffd27a]">{profile.name.charAt(0).toUpperCase()}</div>
           <div className="min-w-0">
-            <p className="font-heading text-[9px] tracking-[0.25em] text-[#7a4a22]">OPERATOR</p>
+            <p className="font-heading text-[9px] tracking-[0.25em] text-[#a8713a]" data-testid="sidebar-account-kind">{account ? account.email : "GUEST"}</p>
             <p className="truncate text-xs text-white" data-testid="sidebar-operator-name">
               {profile.name}
             </p>
@@ -172,8 +183,25 @@ export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplay
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-2 border-t border-[#ff8a1f]/15 px-3 py-2 text-[11px] text-[#d9a66a]">
+        <nav className="flex gap-2.5">
+          <Link to="/about" className="hover:text-white" data-testid="sidebar-link-about">About</Link>
+          <Link to="/privacy" className="hover:text-white" data-testid="sidebar-link-privacy">Privacy</Link>
+          <Link to="/terms" className="hover:text-white" data-testid="sidebar-link-terms">Terms</Link>
+        </nav>
+        {account ? (
+          <button type="button" onClick={onSignOut} data-testid="sidebar-signout" className="inline-flex items-center gap-1 text-[#ffd27a] hover:text-white">
+            <LogOut size={12} /> Sign out
+          </button>
+        ) : (
+          <button type="button" onClick={onSignIn} data-testid="sidebar-signin" className="inline-flex items-center gap-1 text-[#ffd27a] hover:text-white">
+            <LogIn size={12} /> Sign in
+          </button>
+        )}
+      </div>
+
       <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} profile={profile} />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} onReplayIntro={onReplayIntro} onResetProfile={onResetProfile} profile={profile} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} onReplayIntro={onReplayIntro} onResetProfile={onResetProfile} profile={profile} isGuest={!account} />
     </aside>
   );
 }
@@ -226,7 +254,8 @@ function MemoryDialog({ open, onOpenChange, profile }: { open: boolean; onOpenCh
   );
 }
 
-function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, profile }: { open: boolean; onOpenChange: (o: boolean) => void; onReplayIntro: () => void; onResetProfile: () => void; profile: Profile }) {
+function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, profile, isGuest }: { open: boolean; onOpenChange: (o: boolean) => void; onReplayIntro: () => void; onResetProfile: () => void; profile: Profile; isGuest: boolean }) {
+  const prefs = useSettings();
   const status = useQuery({ queryKey: ["voice-status"], queryFn: () => apiGet<VoiceStatus>("/voice/status"), enabled: open, staleTime: 60_000 });
   const [liveSearch, setLiveSearch] = useState(storage.get(KEYS.liveSearch) !== "off");
   const voice = useVoice();
@@ -236,7 +265,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
   const [theme, setTheme] = useState<InterfaceTheme>(profile.theme);
   const models = useQuery({ queryKey: ["models"], queryFn: () => apiGet<ModelInfo[]>("/pandi/models"), enabled: open, staleTime: Infinity });
   const [model, setModel] = useState(storage.get(KEYS.model) ?? "gpt-5.1");
-  const MODEL_LABELS: Record<string, string> = { "gpt-5.1": "GPT-5.1 (primary)", "gemini-3-flash-preview": "Gemini 3 Flash (fallback)", "gemini-3.1-pro-preview": "Gemini 3.1 Pro (live web search)", "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-opus-5-5": "Claude Opus 5.5", "claude-haiku-4-5-20251001": "Claude Haiku 4.5 (fastest)" };
+  const MODEL_LABELS: Record<string, string> = {}; // labels come from the server model config
   useEffect(() => {
     if (!("speechSynthesis" in window)) return;
     const refresh = () => setVoices(listBrowserVoices());
@@ -265,7 +294,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
       <DialogContent className="hud-panel max-h-[90dvh] overflow-y-auto border-[#ff8a1f]/30 text-[#fff5e8] sm:max-w-md" data-testid="settings-dialog">
         <DialogHeader>
           <DialogTitle className="font-heading text-sm tracking-[0.2em] text-white">SETTINGS</DialogTitle>
-          <DialogDescription className="text-xs text-[#d9a66a]">System configuration for PANDI AI Mark II.</DialogDescription>
+          <DialogDescription className="text-xs text-[#d9a66a]">System configuration for Pandi AI Mark 2.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <div className="rounded border border-[#ff8a1f]/20 bg-black/40 p-3" data-testid="settings-voice-status">
@@ -312,7 +341,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
                 <option key={m.id} value={m.id} label={MODEL_LABELS[m.id] ?? m.label} data-testid={`settings-model-option-${m.id}`} />
               ))}
             </select>
-            <span className="mt-1 block text-[10px] text-[#a8713a]">Questions needing current information always use Gemini live search.</span>
+            <span className="mt-1 block text-[10px] text-[#a8713a]">You can also switch models from the chat box.</span>
           </label>
           <label className="block rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
             <span className="text-xs text-[#d9a66a]">Voice selection</span>
@@ -333,6 +362,30 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
           </label>
           <label className="block rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
             <span className="flex items-center justify-between text-xs text-[#d9a66a]">
+              Voice speed <span className="font-heading text-[10px] text-[#ffd27a]" data-testid="settings-voice-speed-value">{prefs.voice_speed.toFixed(2)}x</span>
+            </span>
+            <input type="range" min={0.5} max={2} step={0.05} value={prefs.voice_speed} onChange={(e) => { const v = Number(e.target.value); updateSettings({ voice_speed: v }); applyVoiceSpeed(v); }} data-testid="settings-voice-speed" className="mt-2 w-full accent-[#ff8a1f]" />
+          </label>
+          <label className="block rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
+            <span className="flex items-center justify-between text-xs text-[#d9a66a]">
+              Send after silence <span className="font-heading text-[10px] text-[#ffd27a]" data-testid="settings-silence-value">{(prefs.silence_ms / 1000).toFixed(1)} s</span>
+            </span>
+            <input type="range" min={1000} max={6000} step={500} value={prefs.silence_ms} onChange={(e) => updateSettings({ silence_ms: Number(e.target.value) })} data-testid="settings-silence-delay" className="mt-2 w-full accent-[#ff8a1f]" />
+          </label>
+          <label className="block rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
+            <span className="text-xs text-[#d9a66a]">Start word (wakes the mic after a message is sent)</span>
+            <input value={prefs.start_word} maxLength={40} onChange={(e) => updateSettings({ start_word: e.target.value })} data-testid="settings-start-word" className="mt-1 h-9 w-full rounded border border-[#ff8a1f]/30 bg-[#050302] px-2 text-sm text-white focus:border-[#ff8a1f] focus:outline-none" />
+          </label>
+          <button type="button" onClick={() => updateSettings({ wake_enabled: !prefs.wake_enabled })} data-testid="settings-wake-toggle" className="flex w-full items-center justify-between rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2 hover:bg-[#ff8a1f]/10">
+            <span>Wait for the start word after sending</span>
+            <span className={`font-heading text-[10px] tracking-widest ${prefs.wake_enabled ? "text-[#52ffa8]" : "text-[#a8713a]"}`}>{prefs.wake_enabled ? "ON" : "OFF"}</span>
+          </button>
+          <button type="button" onClick={() => updateSettings({ large_text: !prefs.large_text })} data-testid="settings-large-text-toggle" className="flex w-full items-center justify-between rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2 hover:bg-[#ff8a1f]/10">
+            <span>Larger text</span>
+            <span className={`font-heading text-[10px] tracking-widest ${prefs.large_text ? "text-[#52ffa8]" : "text-[#a8713a]"}`}>{prefs.large_text ? "ON" : "OFF"}</span>
+          </button>
+          <label className="block rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
+            <span className="flex items-center justify-between text-xs text-[#d9a66a]">
               Theme intensity <span className="font-heading text-[10px] text-[#ffd27a]">{glow}%</span>
             </span>
             <input type="range" min={20} max={150} step={5} value={glow} onChange={(e) => applyGlow(Number(e.target.value))} data-testid="settings-theme-intensity" className="mt-2 w-full accent-[#ff8a1f]" />
@@ -347,7 +400,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
             data-testid="settings-live-search-toggle"
             className="flex w-full items-center justify-between rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2 hover:bg-[#ff8a1f]/10"
           >
-            <span>Live web search for current information</span>
+            <span>Auto-search when a question needs current information</span>
             <span className={`font-heading text-[10px] tracking-widest ${liveSearch ? "text-[#52ffa8]" : "text-[#a8713a]"}`}>{liveSearch ? "ON" : "OFF"}</span>
           </button>
           <label className="block rounded border border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
@@ -368,7 +421,7 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
             onClick={() => { onOpenChange(false); onReplayIntro(); }} data-testid="settings-replay-intro" className="w-full rounded border border-[#ff8a1f]/40 bg-[#ff8a1f]/10 px-3 py-2 text-left hover:bg-[#ff8a1f]/20">
             Replay intro video
           </button>
-          <button
+          {isGuest && <button
             type="button"
             onClick={() => {
               if (window.confirm("Reset your profile? This forgets your name, memory link and local chat selection on this device.")) {
@@ -380,14 +433,11 @@ function SettingsDialog({ open, onOpenChange, onReplayIntro, onResetProfile, pro
             className="w-full rounded border border-[#ff3b3b]/40 bg-[#ff3b3b]/10 px-3 py-2 text-left text-[#ff9d9d] hover:bg-[#ff3b3b]/20"
           >
             Reset profile
-          </button>
+          </button>}
           <div className="rounded border border-[#ff8a1f]/20 bg-black/40 p-3 text-center" data-testid="about-section">
             <Info size={14} className="mx-auto mb-1 text-[#ff8a1f]" />
-            <p className="font-heading text-xs tracking-[0.25em] text-white">PANDI AI MARK II</p>
-            <p className="mt-1 text-[11px] text-[#d9a66a]">Personalized Advanced Neural Digital Intelligence</p>
-            <p className="mt-1 text-[11px] text-[#ffe3b8]">
-              Created by <b data-testid="about-creator-name">{CREATOR_NAME}</b>
-            </p>
+            <p className="font-heading text-xs tracking-[0.25em] text-white">PANDI AI MARK 2</p>
+            <p className="mt-1 text-[11px] text-[#d9a66a]">{APP_FULL_FORM}</p>
             <CreditsFooter testId="about-footer-credits" className="mt-3 border-t border-[#ff8a1f]/20 pt-3" />
           </div>
         </div>

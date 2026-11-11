@@ -212,3 +212,38 @@ button, a, input, textarea, select { transition: border-color 180ms ease, backgr
 .fire-text { background: linear-gradient(90deg, #ffd27a, #ff8a1f 55%, #c2300a); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 10px rgba(255, 138, 31, 0.6)); }
 .fire-border { border-image: linear-gradient(135deg, #ffd27a, #ff8a1f, #c2300a) 1; }
 .hud-panel { background: linear-gradient(160deg, rgba(255, 138, 31, 0.05), rgba(0, 0, 0, 0.72)); border-color: rgba(255, 138, 31, 0.35); box-shadow: 0 0 18px rgba(255, 138, 31, calc(0.18 * var(--glow))), inset 0 0 14px rgba(194, 48, 10, 0.08); }
+
+/* Animated portal logo (SVG + CSS only) */
+.portal { cursor: pointer; filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.45)); transition: filter 220ms ease; }
+.portal:hover { filter: drop-shadow(0 0 14px rgba(56, 225, 255, 0.85)) brightness(1.25); }
+.portal-ring { transform-origin: 50px 50px; transform-box: view-box; animation: reactor-cw var(--d, 10s) linear infinite; }
+.portal-ring-rev { animation-name: reactor-ccw; }
+.portal[data-boost="true"] .portal-ring { animation-duration: calc(var(--d, 10s) / 8); }
+.portal-core { transform-origin: 50px 50px; transform-box: view-box; }
+@keyframes portal-pulse { 0%, 100% { transform: scale(0.82); opacity: 0.65; } 50% { transform: scale(1.18); opacity: 1; } }
+@keyframes portal-flash { 0% { transform: scale(1); filter: brightness(1); } 35% { transform: scale(1.7); filter: brightness(2.4); } 100% { transform: scale(1); filter: brightness(1); } }
+.portal[data-mode="thinking"] .portal-core { animation: portal-pulse 2.6s ease-in-out infinite; }
+.portal[data-flash="true"] .portal-core { animation: portal-flash 0.7s ease-out 1; }
+.portal[data-still="true"] .portal-ring, .portal[data-still="true"] .portal-core { animation: none; }
+.portal[data-still="true"] { cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .portal .portal-ring, .portal .portal-core { animation: none !important; }
+  .lock-overlay * { animation: none !important; }
+}
+
+/* Zero-credit lock and key */
+@keyframes lock-shake { 0%, 100% { transform: translateX(0) rotate(0); } 15% { transform: translateX(-7px) rotate(-4deg); } 30% { transform: translateX(7px) rotate(4deg); } 45% { transform: translateX(-5px) rotate(-3deg); } 60% { transform: translateX(5px) rotate(3deg); } 80% { transform: translateX(-2px); } }
+@keyframes key-turn { 0% { transform: translateX(-90px); opacity: 0; } 45% { transform: translateX(0); opacity: 1; } 70% { transform: translateX(0) rotate(0); } 100% { transform: translateX(0) rotate(90deg); opacity: 1; } }
+@keyframes shackle-open { to { transform: translateY(-12px) rotate(-24deg); } }
+@keyframes lock-fade { to { opacity: 0; } }
+.lock-svg { transform-origin: 50% 60%; }
+.lock-key { opacity: 0; transform-origin: 70px 81px; transform-box: view-box; }
+.lock-shackle { transform-origin: 102px 56px; transform-box: view-box; }
+.lock-overlay[data-phase="locked"] .lock-svg { animation: lock-shake 0.7s ease-in-out 0.2s 1; }
+.lock-overlay[data-phase="unlocking"] .lock-svg { animation: lock-shake 0.5s ease-in-out 1; }
+.lock-overlay[data-phase="unlocking"] .lock-key { animation: key-turn 1.2s ease-in-out 0.5s forwards; }
+.lock-overlay[data-phase="unlocking"] .lock-shackle { animation: shackle-open 0.3s ease-out 1.7s forwards; }
+.lock-overlay[data-phase="unlocking"] { animation: lock-fade 0.6s ease-in 2.1s forwards; }
+
+/* Larger text option (default for ages 60+) */
+.pandi-large-text .lt-zoom { zoom: 1.16; }

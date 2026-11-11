@@ -65,6 +65,7 @@ class ChatMessage(BaseModel):
     sources: list[SourceRef] = Field(default_factory=list)
     scene: SceneSpec | None = None
     attachments: list[str] = Field(default_factory=list)
+    image_url: str | None = None
 
     @field_validator("created_at", mode="after")
     @classmethod
@@ -92,8 +93,10 @@ class ChatStreamRequest(BaseModel):
     profile_id: str | None = Field(default=None, max_length=120)
     message: str = Field(min_length=1, max_length=12_000)
     language: str = "auto"
-    model: str = "gemini-3.1-pro-preview"
-    use_live_search: bool = True
+    model: str = "gpt-5.1"
+    use_live_search: bool = True  # auto: search only when the question needs current information
+    force_search: bool = False  # chat "Search" toggle: always search the live web
+    force_image: bool = False  # chat "Create image" button
     file_ids: list[str] = Field(default_factory=list, max_length=8)
 
 
@@ -147,6 +150,7 @@ class Creation(BaseModel):
     image_data_url: str | None = None
     model_url: str | None = None
     model_source: Literal["tripo", "procedural"] = "procedural"
+    credits_charged: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("created_at", mode="after")

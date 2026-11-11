@@ -1,6 +1,7 @@
 // Official PANDI voice engine: ElevenLabs TTS via /api/voice/tts with browser speech-synthesis fallback.
 // A tiny external store so the arc reactor, waveform and 3D step highlighting can all follow playback.
 import { useSyncExternalStore } from "react";
+import { getSettings } from "@/lib/settings";
 
 export type VoiceStatusKind = "idle" | "loading" | "speaking";
 
@@ -159,6 +160,11 @@ function cleanup() {
   }
 }
 
+/** Apply a new speed (0.5x-2x) to whatever is playing right now. */
+export function applyVoiceSpeed(speed: number) {
+  if (audio) audio.playbackRate = speed;
+}
+
 export function stopSpeaking() {
   token += 1;
   cleanup();
@@ -176,6 +182,7 @@ async function speakWithElevenLabs(text: string, myToken: number): Promise<boole
   if (myToken !== token) return false;
   objectUrl = URL.createObjectURL(blob);
   audio = new Audio(objectUrl);
+  audio.playbackRate = getSettings().voice_speed;
   attachAnalyser(audio);
   await new Promise<void>((resolve, reject) => {
     if (!audio) return reject(new Error("no audio"));
@@ -204,7 +211,7 @@ function speakWithBrowser(text: string, myToken: number): Promise<void> {
       voices[0];
     if (preferred) u.voice = preferred;
     // Jarvis-style: deep, calm, confident — lower pitch, measured pace.
-    u.rate = 0.94;
+    u.rate = Math.min(2, Math.max(0.5, 0.94 * getSettings().voice_speed));
     u.pitch = 0.72;
     const total = Math.max(1, text.length);
     u.onboundary = (e) => {

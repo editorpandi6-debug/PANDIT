@@ -11,7 +11,7 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
   const [name, setName] = useState("");
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const line = "Welcome to PANDI AI Mark II. What should I call you?";
+  const line = "Welcome to Pandi AI Mark 2. What should I call you?";
 
   useEffect(() => {
     let i = 0;
@@ -37,6 +37,7 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
     const local: Profile = { profile_id: profileId, name: value, avatar_data_url: null, memory: [], voice_mode: "text", theme: "agni", created_at: now, updated_at: now };
     storage.set(KEYS.profileId, profileId);
     storage.set(KEYS.name, value);
+    storage.set(KEYS.authMode, "guest");
     const body: ProfileUpsert = { name: value };
     apiPut<Profile>(`/pandi/profile/${profileId}`, body).catch(() => toast.warning("Name saved locally — the server could not be reached."));
     onDone(local);
@@ -48,7 +49,7 @@ export function NameScreen({ onDone }: { onDone: (profile: Profile) => void }) {
       <div className="screen-enter relative z-10 flex w-full max-w-md flex-col items-center text-center">
         <BrandLogo testId="name-screen-logo" className="mb-6 w-52 sm:w-64" />
         <h1 className="font-heading text-2xl font-bold tracking-[0.22em] text-white glow-text sm:text-3xl" data-testid="name-screen-title">
-          PANDI AI MARK II
+          PANDI AI MARK 2
         </h1>
         <p className="mt-2 font-heading text-[11px] tracking-[0.42em] text-[#ff8a1f]" data-testid="name-screen-subtitle">
           THE HOLOGRAM INTELLIGENCE

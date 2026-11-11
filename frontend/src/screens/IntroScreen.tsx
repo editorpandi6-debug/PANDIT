@@ -4,7 +4,7 @@ import { Play, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { ArcReactor } from "@/components/ArcReactor";
 import { HoloBackground } from "@/components/HoloBackground";
 import { apiGet } from "@/lib/api";
-import { INTRO_VIDEO_FALLBACK_URL, INTRO_VIDEO_URL, LOGO_URL } from "@/lib/brand";
+import { INTRO_VIDEO_FALLBACK_URL, INTRO_VIDEO_URL } from "@/lib/brand";
 import type { IntroVideoResponse } from "@/lib/types";
 
 const BOOT_LINES = ["INITIALIZING NEURAL CORE", "LOADING HOLOGRAM ENGINE", "CALIBRATING VOICE MATRIX", "LINKING LIVE DATA FEEDS", "PANDI AI MARK II ONLINE"];
@@ -136,7 +136,6 @@ export function IntroScreen({ onDone }: { onDone: () => void }) {
         <video
           ref={videoRef}
           src={playbackUrl}
-          poster={LOGO_URL}
           preload="auto"
           className="h-full w-full object-contain"
           playsInline

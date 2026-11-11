@@ -141,7 +141,7 @@ export function ArcReactor({ size = 64, mode = "idle", className, testId = "arc-
     <div className={cn("relative shrink-0 select-none", className)} style={{ width: size, height: size }} data-testid={testId} data-mode={mode}>
       {beam && <div className="reactor-beam" aria-hidden />}
       <canvas ref={canvasRef} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: size * 1.5, height: size * 1.5 }} aria-hidden />
-      <BrandLogo variant="emblem" testId={`${testId}-logo`} className="absolute inset-[8%]" />
+      <BrandLogo still testId={`${testId}-logo`} className="absolute inset-[8%]" />
     </div>
   );
 }
