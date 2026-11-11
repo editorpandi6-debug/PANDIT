@@ -49,7 +49,7 @@ router = APIRouter(prefix="/pandi", tags=["pandi"])
 UPLOAD_DIR = Path("/tmp/pandi_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_INTRO_VIDEO = "https://customer-assets-gfyr7b9c.emergentagent.net/job_pandi-ai-mark2/artifacts/014c65974f9a29f2_WhatsApp%20Video%202026-10-21%20at%2019.06.55.mp4"
+DEFAULT_INTRO_VIDEO = "https://customer-assets-cm19k8pv.emergentagent.net/job_feee3313-d0c0-4676-bacb-c576a9e7f582/artifacts/920bea1d75fb9cfe_Pandi_AI_Mark_II_title_20261006095531.mp4"
 
 # provider, model — selectable from Settings; all served through the Emergent universal key
 MODELS: dict[str, tuple[str, str]] = {
@@ -94,6 +94,17 @@ def _check_admin_trigger(profile_id: str | None, message: str) -> tuple[bool, bo
     if not is_match and attempt_shaped:
         _admin_fail_log[key].append(time.time())
     return is_match, False
+
+
+def _resolve_api_key(provider: str) -> str:
+    """Use the user's own OpenAI key for OpenAI calls when set; otherwise the Emergent universal key."""
+    if provider == "openai":
+        own = os.environ.get("OPENAI_API_KEY", "").strip()
+        if own:
+            return own
+    return os.environ.get("EMERGENT_LLM_KEY", "").strip()
+
+
 RATE_LIMIT_MAX = 20
 RATE_LIMIT_WINDOW_S = 60
 _rate_log: dict[str, deque] = defaultdict(deque)
@@ -490,7 +501,7 @@ async def _stream_chat(request: ChatStreamRequest, file_rows: list[dict]) -> Asy
         return
 
     api_key = os.environ.get("EMERGENT_LLM_KEY", "")
-    if not api_key:
+    if not api_key and not os.environ.get("OPENAI_API_KEY", "").strip():
         yield _sse("error", {"message": "Live AI is not configured. Text mode remains available after setup."})
         return
 
@@ -534,7 +545,8 @@ Recent conversation context:
         mode = "detect"  # detect -> scene -> text
         scene_emitted = None
         try:
-            chat = LlmChat(api_key=api_key, session_id=f"pandi-{request.session_id}", system_message=system_message).with_model(cand_provider, cand_model)
+            cand_key = _resolve_api_key(cand_provider) or api_key
+            chat = LlmChat(api_key=cand_key, session_id=f"pandi-{request.session_id}", system_message=system_message).with_model(cand_provider, cand_model)
             if should_search:
                 chat = chat.with_tools([{"googleSearch": {}}])
 

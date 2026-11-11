@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArcReactor } from "@/components/ArcReactor";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api";
+import { CREDITS, LOGO_URL, SCHOOL_THANKS } from "@/lib/brand";
 import { KEYS, storage } from "@/lib/storage";
 import type { InterfaceTheme } from "@/lib/theme";
 import { getPreferredVoice, listBrowserVoices, setPreferredVoice, setVoiceEnabled, useVoice } from "@/lib/voice";
@@ -57,6 +58,7 @@ export function Sidebar({ profile, sessionId, onNewChat, onOpenSession, onReplay
     <aside className="flex h-full w-full flex-col bg-[#050302]/95 text-[#ffe3b8]" data-testid="sidebar">
       <div className="flex items-center justify-between border-b border-[#ff8a1f]/15 px-4 py-3">
         <div className="flex items-center gap-2">
+          <img src={LOGO_URL} alt="PANDI AI" data-testid="brand-logo" className="h-7 w-7 rounded object-cover" />
           <ArcReactor size={28} mode={voice.status === "speaking" ? "speaking" : "idle"} testId="sidebar-reactor" />
           <span className="font-heading text-[11px] tracking-[0.25em] text-white">PANDI AI</span>
         </div>

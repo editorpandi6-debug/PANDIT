@@ -1,4 +1,4 @@
-"""Official PANDI voice: ElevenLabs instant voice clone of /assets/my-voice.mp3 with browser fallback."""
+"""PANDI voice: Fish Audio (custom cloned voice) → ElevenLabs clone of my-voice.mp3 → browser speech, in that order."""
 
 import logging
 import os
@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from typing import AsyncIterator
 
+import httpx
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -21,6 +22,8 @@ SAMPLE_PATH = Path(__file__).parent.parent.parent / "frontend" / "public" / "ass
 UPLOAD_DIR = Path("/tmp/pandi_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 SETTINGS_KEY = "voice"
+FISH_VOICE_ID = "06d391f12711442981bf4d25a9aa497b"
+FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 
 
 def _api_key() -> str:
@@ -93,8 +96,34 @@ async def resolve_voice() -> tuple[str | None, bool, str]:
             return None, False, f"ElevenLabs unavailable: {str(inner)[:120]}"
 
 
+def _fish_api_key() -> str:
+    return os.environ.get("FISH_AUDIO_API_KEY", "").strip()
+
+
+async def _fish_audio_response(text: str) -> httpx.Response:
+    headers = {"Authorization": f"Bearer {_fish_api_key()}", "Content-Type": "application/json", "model": "s2.1-pro"}
+    payload = {"text": text, "reference_id": FISH_VOICE_ID, "format": "mp3"}
+    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+    req = client.build_request("POST", FISH_TTS_URL, headers=headers, json=payload)
+    response = await client.send(req, stream=True)
+    response._pandi_client = client  # type: ignore[attr-defined]
+    return response
+
+
+async def _fish_audio_bytes(response: httpx.Response) -> AsyncIterator[bytes]:
+    try:
+        async for chunk in response.aiter_bytes():
+            if chunk:
+                yield chunk
+    finally:
+        await response.aclose()
+        await response._pandi_client.aclose()  # type: ignore[attr-defined]
+
+
 @router.get("/status", response_model=VoiceStatus)
 async def voice_status() -> VoiceStatus:
+    if _fish_api_key():
+        return VoiceStatus(configured=True, provider="fish_audio", voice_id=FISH_VOICE_ID, cloned=True, detail="PANDI's official Fish Audio voice is ready.")
     voice_id, cloned, detail = await resolve_voice()
     return VoiceStatus(
         configured=voice_id is not None,
@@ -126,6 +155,17 @@ async def _audio_stream(voice_id: str, text: str) -> AsyncIterator[bytes]:
 
 @router.post("/tts")
 async def text_to_speech(request: TTSRequest) -> StreamingResponse:
+    if _fish_api_key():
+        try:
+            response = await _fish_audio_response(request.text)
+            if response.status_code >= 400:
+                logger.warning("Fish Audio TTS failed (%s); falling back to ElevenLabs/browser.", response.status_code)
+                await response.aclose()
+                await response._pandi_client.aclose()  # type: ignore[attr-defined]
+            else:
+                return StreamingResponse(_fish_audio_bytes(response), media_type="audio/mpeg")
+        except Exception:
+            logger.exception("Fish Audio TTS failed; falling back to ElevenLabs/browser")
     voice_id, _cloned, detail = await resolve_voice()
     if not voice_id:
         raise HTTPException(status_code=503, detail=detail)
