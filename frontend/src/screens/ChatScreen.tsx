@@ -9,11 +9,12 @@ import { ApiError, apiGet, apiStream } from "@/lib/api";
 import { useSpeechRecognition } from "@/lib/speech";
 import { KEYS, newId, storage } from "@/lib/storage";
 import { speak, stopSpeaking, useVoice } from "@/lib/voice";
-import type { ChatHistory, ChatMessage, ChatStreamRequest, FileUploadResponse, Profile, SceneSpec } from "@/lib/types";
+import type { ChatHistory, ChatMessage, ChatStreamRequest, FileUploadResponse, OwnerEvent, Profile, SceneSpec } from "@/lib/types";
 import { CreateTab } from "./CreateTab";
 import { HologramLabTab } from "./HologramLabTab";
 import { InputBar } from "./InputBar";
 import { MessageBubble } from "./MessageBubble";
+import { OwnerConsole } from "./OwnerConsole";
 import { Sidebar } from "./Sidebar";
 
 const SUGGESTIONS = [
@@ -42,6 +43,8 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
   const [listening, setListening] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [greeting, setGreeting] = useState<ChatMessage | null>(null);
+  const [ownerEvent, setOwnerEvent] = useState<OwnerEvent | null>(null);
+  const [ownerConsoleOpen, setOwnerConsoleOpen] = useState(false);
   const greetedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -124,6 +127,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
       let scene: SceneSpec | null = null;
       let finalId = draftId;
       let failed: string | null = null;
+      let ownerPayload: OwnerEvent | null = null;
       try {
         const res = await apiStream("/pandi/chat/stream", body);
         const reader = res.body?.getReader();
@@ -152,6 +156,9 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
             } else if (event === "scene") {
               scene = data as SceneSpec;
               setDraft((d) => (d ? { ...d, scene } : d));
+            } else if (event === "owner") {
+              ownerPayload = data as OwnerEvent;
+              setOwnerEvent(ownerPayload);
             } else if (event === "meta") {
               if (data.live_search) setDraft((d) => (d ? { ...d, live_search: true } : d));
               if (data.remembered) {
@@ -186,6 +193,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
       setDraft(null);
       setPendingUser(null);
       if (content) void speak(finalId, content);
+      if (ownerPayload) setOwnerConsoleOpen(true);
     },
     [draft, profile.profile_id, qc, sessionId],
   );
@@ -357,6 +365,7 @@ export function ChatScreen({ profile, onReplayIntro, onResetProfile }: Props) {
           </p>
         </div>
       )}
+      <OwnerConsole open={ownerConsoleOpen} onOpenChange={setOwnerConsoleOpen} profileId={profile.profile_id} event={ownerEvent} />
     </div>
   );
 }

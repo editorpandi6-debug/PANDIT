@@ -1,7 +1,10 @@
 import json
+import hashlib
+import hmac
 import logging
 import os
 import re
+import secrets as secrets_lib
 import time
 import uuid
 from collections import defaultdict, deque
@@ -30,6 +33,8 @@ from models.pandi import (
     FileUploadResponse,
     IntroVideoResponse,
     MemoryUpdate,
+    OwnerOverview,
+    OwnerStatus,
     Profile,
     ProfileUpsert,
     SceneSpec,
@@ -59,7 +64,36 @@ DEFAULT_MODEL = "gpt-5.1"
 FALLBACK_MODEL = "gemini-3-flash"
 SEARCH_MODEL = "gemini-3.1-pro-preview"  # live Google Search grounding is Gemini-only
 
-# --- per-user rate limit: a simple in-memory sliding window (reset on restart) ---
+# --- hidden owner-console trigger: exact message "123P456P" (case-insensitive) ---
+ADMIN_CODE_PATTERN = re.compile(r"^[A-Za-z0-9]{4,16}$")
+ADMIN_FAIL_MAX = 5
+ADMIN_FAIL_WINDOW_S = 600
+_admin_fail_log: dict[str, deque] = defaultdict(deque)
+
+
+def _looks_like_admin_attempt(text: str) -> bool:
+    return bool(ADMIN_CODE_PATTERN.match(text)) and any(c.isdigit() for c in text) and any(c.isalpha() for c in text)
+
+
+def _check_admin_trigger(profile_id: str | None, message: str) -> tuple[bool, bool]:
+    """Returns (is_the_admin_code, rate_limited). Constant-time compare against ADMIN_CODE."""
+    admin_code = os.environ.get("ADMIN_CODE", "").strip()
+    candidate = message.strip()
+    if not admin_code or not candidate:
+        return False, False
+    key = profile_id or "anonymous"
+    attempt_shaped = _looks_like_admin_attempt(candidate)
+    if attempt_shaped:
+        now = time.time()
+        dq = _admin_fail_log[key]
+        while dq and now - dq[0] > ADMIN_FAIL_WINDOW_S:
+            dq.popleft()
+        if len(dq) >= ADMIN_FAIL_MAX:
+            return False, True
+    is_match = hmac.compare_digest(candidate.upper().encode(), admin_code.upper().encode())
+    if not is_match and attempt_shaped:
+        _admin_fail_log[key].append(time.time())
+    return is_match, False
 RATE_LIMIT_MAX = 20
 RATE_LIMIT_WINDOW_S = 60
 _rate_log: dict[str, deque] = defaultdict(deque)
@@ -237,6 +271,23 @@ async def get_intro_video() -> IntroVideoResponse:
     return IntroVideoResponse(video_url=doc.get("intro_video_url") or DEFAULT_INTRO_VIDEO)
 
 
+@router.get("/owner/status", response_model=OwnerStatus)
+async def owner_status(profile_id: str = "") -> OwnerStatus:
+    owner_doc = await db.pandi_owner.find_one({})
+    return OwnerStatus(is_owner=bool(owner_doc and owner_doc.get("owner_profile_id") == profile_id), claimed=bool(owner_doc))
+
+
+@router.get("/owner/overview", response_model=OwnerOverview)
+async def owner_overview(profile_id: str = "") -> OwnerOverview:
+    owner_doc = await db.pandi_owner.find_one({})
+    if not owner_doc or owner_doc.get("owner_profile_id") != profile_id:
+        raise HTTPException(status_code=403, detail="Owner access only.")
+    total_profiles = await db.pandi_profiles.count_documents({})
+    total_messages = await db.pandi_messages.count_documents({})
+    total_creations = await db.pandi_creations.count_documents({})
+    return OwnerOverview(total_profiles=total_profiles, total_messages=total_messages, total_creations=total_creations, claimed_at=owner_doc["claimed_at"])
+
+
 @router.get("/today", response_model=TodayResponse)
 async def get_today() -> TodayResponse:
     return TodayResponse(today=today_iso(), utc_timestamp=datetime.now(timezone.utc))
@@ -384,6 +435,44 @@ async def _stream_chat(request: ChatStreamRequest, file_rows: list[dict]) -> Asy
     if should_search and provider != "gemini":
         provider, model_name = MODELS[DEFAULT_MODEL]  # live Google Search grounding is Gemini-only
     yield _sse("meta", {"message_id": user_message.id, "today": today, "live_search": should_search, "remembered": remembered, "model": model_name})
+
+    is_admin_code, admin_rate_limited = _check_admin_trigger(request.profile_id, request.message)
+    if admin_rate_limited:
+        answer = "I'm not sure what you mean by that."
+        assistant_message = ChatMessage(session_id=request.session_id, role="assistant", content=answer)
+        await db.pandi_messages.insert_one(assistant_message.model_dump())
+        yield _sse("delta", {"text": answer})
+        yield _sse("done", {"message_id": assistant_message.id, "content": answer, "sources": [], "scene": None})
+        return
+    if is_admin_code and request.profile_id:
+        owner_doc = await db.pandi_owner.find_one({})
+        if not owner_doc:
+            recovery_key = secrets_lib.token_hex(8).upper()
+            recovery_key = "-".join([recovery_key[i : i + 4] for i in range(0, len(recovery_key), 4)])
+            await db.pandi_owner.insert_one(
+                {
+                    "owner_profile_id": request.profile_id,
+                    "claimed_at": datetime.now(timezone.utc),
+                    "recovery_key_hash": hashlib.sha256(recovery_key.encode()).hexdigest(),
+                }
+            )
+            answer = "Owner Console unlocked for this account. Save your one-time recovery key now — it will not be shown again."
+            assistant_message = ChatMessage(session_id=request.session_id, role="assistant", content=answer)
+            await db.pandi_messages.insert_one(assistant_message.model_dump())
+            yield _sse("delta", {"text": answer})
+            yield _sse("owner", {"action": "claimed", "recovery_key": recovery_key})
+            yield _sse("done", {"message_id": assistant_message.id, "content": answer, "sources": [], "scene": None})
+            return
+        if owner_doc.get("owner_profile_id") == request.profile_id:
+            answer = "Welcome back, Owner. Opening the console."
+            assistant_message = ChatMessage(session_id=request.session_id, role="assistant", content=answer)
+            await db.pandi_messages.insert_one(assistant_message.model_dump())
+            yield _sse("delta", {"text": answer})
+            yield _sse("owner", {"action": "opened", "recovery_key": None})
+            yield _sse("done", {"message_id": assistant_message.id, "content": answer, "sources": [], "scene": None})
+            return
+        # Someone else already owns the console: fall through and answer as completely normal chat —
+        # never reveal that the phrase is special to a non-owner.
 
     if _is_creator_query(request.message):
         assistant_message = ChatMessage(session_id=request.session_id, role="assistant", content=CREATOR_ANSWER)

@@ -153,3 +153,20 @@ export interface CreationSummary {
   image_data_url: string | null;
   created_at: string;
 }
+
+export interface OwnerStatus {
+  is_owner: boolean;
+  claimed: boolean;
+}
+
+export interface OwnerOverview {
+  total_profiles: number;
+  total_messages: number;
+  total_creations: number;
+  claimed_at: string;
+}
+
+export interface OwnerEvent {
+  action: "claimed" | "opened";
+  recovery_key: string | null;
+}

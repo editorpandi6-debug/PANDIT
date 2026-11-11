@@ -160,3 +160,15 @@ class CreationSummary(BaseModel):
     name: str
     image_data_url: str | None = None
     created_at: datetime
+
+
+class OwnerStatus(BaseModel):
+    is_owner: bool
+    claimed: bool
+
+
+class OwnerOverview(BaseModel):
+    total_profiles: int
+    total_messages: int
+    total_creations: int
+    claimed_at: datetime
