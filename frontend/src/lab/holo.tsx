@@ -117,6 +117,7 @@ interface LabelProps {
   children: ReactNode;
   active?: boolean;
   small?: boolean;
+  compact?: boolean;
   onClick?: () => void;
 }
 
@@ -124,11 +125,11 @@ interface LabelProps {
  * Billboard label rendered as a WebGL sprite from an offscreen canvas — no DOM portals (drei's Html crashes on
  * unmount under React 19), always faces the camera, constant on-screen size.
  */
-export function Label({ position, children, active = false, small = false, onClick }: LabelProps) {
+export function Label({ position, children, active = false, small = false, compact = false, onClick }: LabelProps) {
   const text = toText(children).replace(/\s+/g, " ").trim();
   const { texture, aspect } = useMemo(() => {
-    const px = small ? 26 : 30;
-    const pad = 14;
+    const px = compact ? 16 : small ? 26 : 30;
+    const pad = compact ? 8 : 14;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
     const font = `600 ${px}px "Orbitron Variable", "Inter Variable", sans-serif`;
@@ -154,9 +155,9 @@ export function Label({ position, children, active = false, small = false, onCli
     tex.minFilter = LinearFilter;
     tex.needsUpdate = true;
     return { texture: tex, aspect: canvas.width / canvas.height };
-  }, [text, active, small]);
+  }, [text, active, small, compact]);
   useEffect(() => () => texture.dispose(), [texture]);
-  const h = small ? 0.052 : 0.062;
+  const h = compact ? 0.035 : small ? 0.052 : 0.062;
   return (
     <sprite
       position={position}

@@ -6,6 +6,7 @@ import { ArcReactor } from "@/components/ArcReactor";
 import { useVoice } from "@/lib/voice";
 import type { SceneSpec } from "@/lib/types";
 import type { RenderMode, SelectInfo } from "@/lab/holo";
+import { SOLAR_SYSTEM_BODIES } from "@/lab/scenes/solarSystemData";
 
 const LabCanvas = lazy(() => import("@/lab/LabCanvas"));
 
@@ -68,6 +69,10 @@ export function VirtualLab({ spec, messageId, tall = false, onExplain }: Virtual
   const [fullscreen, setFullscreen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectInfo | null>(null);
+  const [selectedSolarBody, setSelectedSolarBody] = useState(-1);
+  const [showOrbits, setShowOrbits] = useState(true);
+  const [showLabels, setShowLabels] = useState(true);
+  const [elapsedDays, setElapsedDays] = useState(0);
   const [manualStep, setManualStep] = useState(-1);
   const [inView, setInView] = useState(true);
   const [webglOk] = useState(() => {
@@ -116,13 +121,29 @@ export function VirtualLab({ spec, messageId, tall = false, onExplain }: Virtual
   const title = useMemo(() => (spec.title || spec.scene.replace(/-/g, " ")).toUpperCase(), [spec.title, spec.scene]);
   const isGeometryBox = spec.scene === "geometry" && ["cube", "cuboid", undefined].includes((spec.params?.shape as string | undefined)?.toLowerCase());
   const note = SCALE_NOTE[spec.scene];
+  const isSolarSystem = spec.scene === "solar-system";
+  const daysPerSecond = speed * 16;
+  const solarSpeedValue = Math.round((Math.log(daysPerSecond / 0.5) / Math.log(1000)) * 100);
+  const selectedSolarInfo = selectedSolarBody < 0 ? null : SOLAR_SYSTEM_BODIES[selectedSolarBody];
+  const solarSystemControls = useMemo(() => ({
+    selectedBody: selectedSolarBody,
+    onSelectBody: setSelectedSolarBody,
+    showOrbits,
+    showLabels,
+  }), [selectedSolarBody, showOrbits, showLabels]);
+
+  useEffect(() => {
+    if (!isSolarSystem || !playing) return;
+    const timer = window.setInterval(() => setElapsedDays((days) => days + daysPerSecond * 0.25), 250);
+    return () => window.clearInterval(timer);
+  }, [daysPerSecond, isSolarSystem, playing]);
 
   return (
     <div
       ref={box}
       data-testid="virtual-lab"
       data-scene={spec.scene}
-      className={`hud-panel hud-corners ${tall ? "h-full" : "my-3"} overflow-hidden rounded-md ${fullscreen && !document.fullscreenElement ? "fixed inset-2 z-50" : ""} ${document.fullscreenElement === box.current ? "flex h-screen flex-col bg-black" : ""}`}
+      className={`hud-panel hud-corners ${tall ? "h-full" : "my-3"} ${tall && isSolarSystem ? "overflow-y-auto" : "overflow-hidden"} rounded-md ${fullscreen && !document.fullscreenElement ? "fixed inset-2 z-50" : ""} ${document.fullscreenElement === box.current ? "flex h-screen flex-col bg-black" : ""}`}
     >
       <span className="hud-c" />
       <div className="flex items-center justify-between gap-2 border-b border-[#ff8a1f]/20 bg-black/40 px-3 py-2">
@@ -133,12 +154,16 @@ export function VirtualLab({ spec, messageId, tall = false, onExplain }: Virtual
           </h3>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <ToolButton onClick={() => setPlaying((p) => !p)} label={playing ? "Pause animation" : "Play animation"} active={!playing} testId="lab-play-pause">
-            {playing ? <Pause size={14} /> : <Play size={14} />}
-          </ToolButton>
-          <ToolButton onClick={() => setSpeed((s) => (s >= 4 ? 0.5 : s * 2))} label={`Speed ×${speed}`} active={speed !== 1} testId="lab-speed">
-            <Gauge size={14} />
-          </ToolButton>
+          {!isSolarSystem && (
+            <>
+              <ToolButton onClick={() => setPlaying((p) => !p)} label={playing ? "Pause animation" : "Play animation"} active={!playing} testId="lab-play-pause">
+                {playing ? <Pause size={14} /> : <Play size={14} />}
+              </ToolButton>
+              <ToolButton onClick={() => setSpeed((s) => (s >= 4 ? 0.5 : s * 2))} label={`Speed ×${speed}`} active={speed !== 1} testId="lab-speed">
+                <Gauge size={14} />
+              </ToolButton>
+            </>
+          )}
           <ToolButton onClick={() => setAutoRotate((a) => !a)} label="Auto-rotate" active={autoRotate} testId="lab-auto-rotate">
             <RotateCw size={14} />
           </ToolButton>
@@ -181,14 +206,14 @@ export function VirtualLab({ spec, messageId, tall = false, onExplain }: Virtual
                 </div>
               }
             >
-              <LabCanvas spec={spec} playing={playing} speed={speed} autoRotate={autoRotate} toggle={toggle} renderMode={renderMode} explode={explode} activeStep={activeStep} resetSignal={resetSignal} onSelect={onSelect} onError={onError} />
+              <LabCanvas spec={spec} playing={playing} speed={speed} autoRotate={autoRotate} toggle={toggle} renderMode={renderMode} explode={explode} activeStep={activeStep} resetSignal={resetSignal} onSelect={onSelect} onError={onError} solarSystemControls={solarSystemControls} />
             </Suspense>
           </LabBoundary>
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-[#a8713a]">Projection paused while off-screen</div>
         )}
 
-        {selected && !error && (
+        {selected && !error && !isSolarSystem && (
           <div className="hud-panel absolute left-3 top-3 max-w-[240px] rounded px-3 py-2 text-xs animate-fade-up" data-testid="lab-info-panel">
             <div className="mb-1 flex items-center justify-between gap-3">
               <p className="font-heading text-[11px] tracking-widest text-white">{selected.title}</p>
@@ -216,6 +241,71 @@ export function VirtualLab({ spec, messageId, tall = false, onExplain }: Virtual
           </label>
         )}
       </div>
+
+      {isSolarSystem && (
+        <section className="space-y-3 border-t border-[#ff8a1f]/20 bg-black/35 px-3 py-3" data-testid="solar-system-controls">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-[#ff8a1f]/15 pb-3 text-xs">
+            <button type="button" onClick={() => setPlaying((value) => !value)} className="rounded border border-[#ff8a1f]/40 px-3 py-1.5 text-[#ffe3b8] hover:bg-[#ff8a1f]/15" data-testid="solar-play-pause">
+              {playing ? "Pause" : "Play"}
+            </button>
+            <label className="flex min-w-52 flex-1 items-center gap-2 text-[#d9a66a]">
+              Speed
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={solarSpeedValue}
+                onChange={(event) => setSpeed((0.5 * Math.pow(1000, Number(event.target.value) / 100)) / 16)}
+                className="min-w-20 flex-1 accent-[#ffb347]"
+                aria-label="Solar system simulation speed"
+                data-testid="solar-speed"
+              />
+              <span className="min-w-20 text-right text-[#ffe3b8]">{daysPerSecond < 10 ? daysPerSecond.toFixed(1) : Math.round(daysPerSecond)} days/sec</span>
+            </label>
+            <label className="flex items-center gap-1.5 text-[#d9a66a]">
+              <input type="checkbox" checked={showOrbits} onChange={(event) => setShowOrbits(event.target.checked)} className="accent-[#ffb347]" data-testid="solar-orbits" />
+              Orbits
+            </label>
+            <label className="flex items-center gap-1.5 text-[#d9a66a]">
+              <input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} className="accent-[#ffb347]" data-testid="solar-labels" />
+              Labels
+            </label>
+            <span className="ml-auto text-[#a8713a]" data-testid="solar-elapsed">Elapsed: {(elapsedDays / 365.25).toFixed(2)} Earth years</span>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5" aria-label="Select a solar system body">
+            <button type="button" onClick={() => setSelectedSolarBody(-1)} aria-pressed={selectedSolarBody === -1} className={`rounded-full border px-3 py-1 text-xs ${selectedSolarBody === -1 ? "border-[#ffe3b8] bg-white/10 text-white" : "border-white/20 text-[#d9a66a] hover:bg-white/10"}`} data-testid="solar-body-overview">Overview</button>
+            {SOLAR_SYSTEM_BODIES.map((body, index) => (
+              <button key={body.name} type="button" onClick={() => setSelectedSolarBody(index)} aria-pressed={selectedSolarBody === index} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${selectedSolarBody === index ? "border-[#ffe3b8] bg-white/10 text-white" : "border-white/20 text-[#d9a66a] hover:bg-white/10"}`} data-testid={`solar-body-${body.name.toLowerCase()}`}>
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: body.color }} />
+                {body.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="rounded border border-[#ff8a1f]/20 bg-black/30 px-3 py-2.5" aria-live="polite" data-testid="solar-body-info">
+            {selectedSolarInfo ? (
+              <>
+                <h4 className="font-heading text-sm tracking-wider text-[#ffe3b8]">{selectedSolarInfo.name}</h4>
+                <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs sm:grid-cols-5">
+                  {["Diameter", "From Sun", "Day", "Year", "Other"].map((label, index) => (
+                    <div key={label} className="flex flex-col">
+                      <dt className="text-[#a8713a]">{label}</dt>
+                      <dd className="text-[#ffe3b8]">{selectedSolarInfo.stats[index]}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-2 text-xs leading-relaxed text-[#d9a66a]">{selectedSolarInfo.description}</p>
+              </>
+            ) : (
+              <>
+                <h4 className="font-heading text-sm tracking-wider text-[#ffe3b8]">Overview</h4>
+                <p className="mt-1 text-xs leading-relaxed text-[#d9a66a]">Sizes and distances are compressed so every planet stays visible. Colors, axial tilts and orbit speed ratios follow the real thing.</p>
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {(spec.stats?.length > 0 || note) && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ff8a1f]/15 bg-black/30 px-3 py-2" data-testid="lab-stats">

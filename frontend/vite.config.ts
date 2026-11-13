@@ -1,5 +1,5 @@
 import path from "node:path";
-import { defineConfig, type UserConfig } from "vite";
+import { defineConfig, loadEnv, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { visualEdits } from "@emergentbase/visual-edits/vite";
@@ -34,7 +34,8 @@ if (!hotReloadDisabled) {
 }
 
 // https://vite.dev/config/
-export default defineConfig(async () => {
+export default defineConfig(async ({ mode }) => {
+  const env = loadEnv(mode, __dirname, "");
   const emergentOverlay = await loadEmergentOverlay();
   return {
     base: "/proxy/3000/",
@@ -100,11 +101,10 @@ export default defineConfig(async () => {
       // Build-error rendering: emergent-overlay when it loaded, else Vite's own overlay.
       hmr: hotReloadDisabled ? false : { overlay: !emergentOverlay },
       watch: hotReloadDisabled ? null : { usePolling: true, interval: 300 },
-      // The /api proxy convention: frontend code calls relative /api/*, never an
-      // absolute backend URL. Target is the FastAPI dev server (supervisor: backend).
+      // Keep API calls relative; override the local backend for a deployed API if needed.
       proxy: {
         "/api": {
-          target: "http://localhost:8001",
+          target: env.PANDI_API_PROXY_TARGET || "http://localhost:8001",
           changeOrigin: true,
         },
       },

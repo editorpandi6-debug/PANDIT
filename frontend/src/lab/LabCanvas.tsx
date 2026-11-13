@@ -1,12 +1,14 @@
 // Lazy-loaded WebGL canvas for the Virtual Lab. Imported via React.lazy from VirtualLab.tsx so Three.js
 // only downloads when a message actually carries a scene.
 import { OrbitControls } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
+import { Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { LabContext, Lights } from "./holo";
 import type { RenderMode, SelectInfo } from "./holo";
 import { Eclipse, EarthSeasons, GenericHolo, MoonPhases, SolarSystem } from "./scenes/Astronomy";
+import { SOLAR_SYSTEM_BODIES } from "./scenes/solarSystemData";
 import { Cell, DNA, Heart } from "./scenes/Biology";
 import { Atom, Molecule, StatesOfMatter } from "./scenes/Chemistry";
 import { CustomScene, HologramCore } from "./scenes/Custom";
@@ -27,10 +29,18 @@ export interface LabCanvasProps {
   resetSignal: number;
   onSelect: (info: SelectInfo | null) => void;
   onError: (message: string) => void;
+  solarSystemControls: SolarSystemControls;
+}
+
+export interface SolarSystemControls {
+  selectedBody: number;
+  onSelectBody: (index: number) => void;
+  showOrbits: boolean;
+  showLabels: boolean;
 }
 
 const CAMERA: Record<string, [number, number, number]> = {
-  "solar-system": [0, 14, 22],
+  "solar-system": [12, 9, 16],
   "earth-seasons": [0, 8, 12],
   "moon-phases": [0, 7, 9],
   eclipse: [0, 6, 16],
@@ -57,11 +67,11 @@ export function cameraFor(scene: string): [number, number, number] {
   return CAMERA[scene] ?? CAMERA.generic;
 }
 
-function SceneRouter({ spec }: { spec: SceneSpec }) {
+function SceneRouter({ spec, solarSystemControls }: { spec: SceneSpec; solarSystemControls: SolarSystemControls }) {
   const p = spec.params ?? {};
   switch (spec.scene) {
     case "solar-system":
-      return <SolarSystem params={p} />;
+      return <SolarSystem params={p} {...solarSystemControls} />;
     case "earth-seasons":
       return <EarthSeasons />;
     case "moon-phases":
@@ -105,16 +115,45 @@ function SceneRouter({ spec }: { spec: SceneSpec }) {
   }
 }
 
-function Controls({ autoRotate, resetSignal, scene }: { autoRotate: boolean; resetSignal: number; scene: string }) {
+function Controls({ autoRotate, resetSignal, scene, selectedBody }: { autoRotate: boolean; resetSignal: number; scene: string; selectedBody: number }) {
   const ref = useRef<OrbitControlsImpl>(null);
+  const { camera, scene: root } = useThree();
+  const focusPosition = useMemo(() => new Vector3(), []);
+  const cameraOffset = useMemo(() => new Vector3(), []);
+  const desiredDistance = useRef(Math.hypot(...cameraFor("solar-system")));
+  const focusing = useRef(true);
+  const bodyNames = useMemo(() => SOLAR_SYSTEM_BODIES.map((body) => body.name), []);
   useEffect(() => {
     if (resetSignal > 0) ref.current?.reset();
   }, [resetSignal]);
+  useEffect(() => {
+    const radius = SOLAR_SYSTEM_BODIES[selectedBody < 0 ? 0 : selectedBody]?.radius ?? SOLAR_SYSTEM_BODIES[0].radius;
+    desiredDistance.current = selectedBody < 0 ? Math.hypot(...cameraFor("solar-system")) : radius * (selectedBody === 0 ? 3.2 : 5.5) + 0.3;
+    focusing.current = true;
+  }, [selectedBody]);
+  useFrame((_state, delta) => {
+    if (scene !== "solar-system" || !ref.current) return;
+    const bodyName = bodyNames[selectedBody < 0 ? 0 : selectedBody];
+    const targetObject = root.getObjectByName(`solar-body-${bodyName}`);
+    if (!targetObject) return;
+    targetObject.getWorldPosition(focusPosition);
+    const shift = focusPosition.sub(ref.current.target).multiplyScalar(Math.min(1, delta * 3.5));
+    camera.position.add(shift);
+    ref.current.target.add(shift);
+    if (focusing.current) {
+      cameraOffset.copy(camera.position).sub(ref.current.target);
+      const distance = cameraOffset.length();
+      const nextDistance = distance + (desiredDistance.current - distance) * Math.min(1, delta * 2.5);
+      camera.position.copy(ref.current.target).add(cameraOffset.normalize().multiplyScalar(nextDistance));
+      if (Math.abs(nextDistance - desiredDistance.current) < 0.03) focusing.current = false;
+    }
+    ref.current.update();
+  });
   const is2D = scene === "graph" || scene === "equation" || scene === "optics";
-  return <OrbitControls ref={ref} makeDefault enableDamping dampingFactor={0.08} autoRotate={autoRotate && !is2D} autoRotateSpeed={0.8} minDistance={2} maxDistance={60} />;
+  return <OrbitControls ref={ref} makeDefault enableDamping dampingFactor={0.08} autoRotate={autoRotate && !is2D} autoRotateSpeed={0.8} minDistance={scene === "solar-system" ? 0.25 : 2} maxDistance={60} />;
 }
 
-export default function LabCanvas({ spec, playing, speed, autoRotate, toggle, renderMode, explode, activeStep, resetSignal, onSelect, onError }: LabCanvasProps) {
+export default function LabCanvas({ spec, playing, speed, autoRotate, toggle, renderMode, explode, activeStep, resetSignal, onSelect, onError, solarSystemControls }: LabCanvasProps) {
   const ctx = useMemo(() => ({ playing, speed, activeStep, toggle, renderMode, explode, select: onSelect }), [playing, speed, activeStep, toggle, renderMode, explode, onSelect]);
   const camera = cameraFor(spec.scene);
   return (
@@ -129,13 +168,16 @@ export default function LabCanvas({ spec, playing, speed, autoRotate, toggle, re
           onError("The 3D graphics context was lost. The text explanation is still available.");
         });
       }}
-      onPointerMissed={() => onSelect(null)}
+      onPointerMissed={() => {
+        onSelect(null);
+        if (spec.scene === "solar-system") solarSystemControls.onSelectBody(-1);
+      }}
       data-testid="lab-canvas"
     >
       <LabContext.Provider value={ctx}>
         <Lights />
-        <SceneRouter spec={spec} />
-        <Controls autoRotate={autoRotate} resetSignal={resetSignal} scene={spec.scene} />
+        <SceneRouter spec={spec} solarSystemControls={solarSystemControls} />
+        <Controls autoRotate={autoRotate} resetSignal={resetSignal} scene={spec.scene} selectedBody={solarSystemControls.selectedBody} />
       </LabContext.Provider>
     </Canvas>
   );

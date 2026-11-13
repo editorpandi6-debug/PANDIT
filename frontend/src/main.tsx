@@ -10,7 +10,7 @@ import { Toaster } from '@/components/ui/sonner'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <App />
         <Toaster richColors />
       </BrowserRouter>
