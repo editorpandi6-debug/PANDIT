@@ -32,6 +32,8 @@ dist
 
 # Environment files (comprehensive coverage)
 
+/API_KEYS.txt
+
 *token.json*
 *credentials.json*
 
