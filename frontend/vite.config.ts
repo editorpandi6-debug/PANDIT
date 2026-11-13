@@ -38,7 +38,7 @@ export default defineConfig(async ({ mode, command }) => {
   const env = loadEnv(mode, __dirname, "");
   const emergentOverlay = await loadEmergentOverlay();
   return {
-    base: command === "serve" ? "/proxy/3000/" : "/",
+    base: mode === "development" && command === "serve" ? "/proxy/3000/" : "/",
     plugins: [
       react(),
       tailwindcss(),
