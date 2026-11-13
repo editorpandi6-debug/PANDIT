@@ -34,11 +34,11 @@ if (!hotReloadDisabled) {
 }
 
 // https://vite.dev/config/
-export default defineConfig(async ({ mode, command }) => {
+export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
   const emergentOverlay = await loadEmergentOverlay();
   return {
-    base: command === "serve" ? "/proxy/3000/" : "/",
+    base: "/proxy/3000/",
     plugins: [
       react(),
       tailwindcss(),
