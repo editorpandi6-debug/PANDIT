@@ -102,3 +102,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 # Keep router inclusion last so every route registered above is served under /api.
 app.include_router(api_router)
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
